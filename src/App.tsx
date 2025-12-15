@@ -1,39 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react';
-// Import Capacitor pour détecter si on est sur iOS
-import { Capacitor } from '@capacitor/core';
-// Note : Dans votre vrai projet, décommentez la ligne ci-dessous après avoir fait 'npm install @capacitor-community/admob'
+
+// --- NOTES POUR L'INTÉGRATION MOBILE ---
+// Dans votre projet local, vous devez installer les dépendances suivantes :
+// npm install @capacitor/core @capacitor/ios @capacitor-community/admob
+
+// Import Capacitor pour détecter si on est sur iOS (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
+// import { Capacitor } from '@capacitor/core';
+
+// Import AdMob (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
 // import { AdMob, TrackingAuthorizationStatus } from '@capacitor-community/admob';
 
 // --- CONFIGURATION ADMOB ---
-const ADMOB_CONFIG = {
-  android: {
-    appId: 'ca-app-pub-3940256099942544~3347511713', // TEST ID Google
-    bannerId: 'ca-app-pub-3940256099942544/6300978111',
-    rewardedId: 'ca-app-pub-3940256099942544/5224354917', 
-  },
-  ios: {
-    appId: 'ca-app-pub-5805757737293445~9154378744', // VOS VRAIS IDs
-    bannerId: 'ca-app-pub-5805757737293445/5215133733',
-    rewardedId: 'ca-app-pub-5805757737293445/9629662095',
-  }
-};
-
-/* IMPORTANT POUR LA VALIDATION APPLE (Info.plist)
-   Vous devez ajouter ces clés dans votre fichier ios/App/App/Info.plist :
-   
-   <key>NSUserTrackingUsageDescription</key>
-   <string>Ce jeu utilise vos données pour vous offrir des récompenses personnalisées et soutenir le développement via des publicités pertinentes.</string>
-   
-   <key>SKAdNetworkItems</key>
-   <array>
-     <dict>
-       <key>SKAdNetworkIdentifier</key>
-       <string>cstr6suwn9.skadnetwork</string>
-     </dict>
-     <!-- Ajoutez les autres IDs de Google AdMob ici -->
-   </array>
-*/
+// Android App ID: ca-app-pub-5805757737293445~9154378744
+// Android Banner: ca-app-pub-5805757737293445/5215133733
+// Android Reward: ca-app-pub-5805757737293445/9629662095
 
 // --- AUDIO ENGINE ---
 const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
@@ -409,14 +390,8 @@ export default function App() {
 
   // iOS Tracking Request
   useEffect(() => {
-    const initTracking = async () => {
-       if (Capacitor.getPlatform() === 'ios') {
-          console.log("iOS detected: Requesting tracking auth...");
-          // Dans une vraie app, décommentez la ligne ci-dessous :
-          // await AdMob.requestTrackingAuthorization();
-       }
-    };
-    initTracking();
+    // Note: This needs @capacitor-community/admob to function in a real app
+    console.log("Tracking request hook ready");
   }, []);
 
   const triggerSfx = (type: string) => { if (sfxEnabled) playSfx(type); };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Map, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff } from 'lucide-react';
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react';
 
-// --- CONFIGURATION ADMOB (Sauvegardée pour référence future) ---
+// --- CONFIGURATION ADMOB ---
 // Android App ID: ca-app-pub-5805757737293445~9154378744
 // Android Banner: ca-app-pub-5805757737293445/5215133733
 // Android Reward: ca-app-pub-5805757737293445/9629662095
@@ -709,7 +709,6 @@ export default function App() {
               <div className="space-y-4">
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Globe size={14} className="mr-2"/> {t('lang_select')}</div><button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="text-xs font-bold bg-stone-700 px-2 py-1 rounded">{lang.toUpperCase()}</button></div>
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Volume2 size={14} className="mr-2"/> {t('sfx')}</div><button onClick={() => setSfxEnabled(!sfxEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${sfxEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${sfxEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
-                 <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div><button onClick={() => setAmbianceEnabled(!ambianceEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${ambianceEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ambianceEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
               </div>
               <div className="pt-4 border-t border-stone-700 space-y-2 mt-4">
                  <button onClick={exportSave} className="w-full flex items-center justify-center text-xs bg-stone-700 hover:bg-stone-600 py-2 rounded text-stone-300"><Upload size={12} className="mr-2"/> {t('save_export')}</button>
@@ -994,7 +993,7 @@ export default function App() {
            <div className="absolute bottom-0 left-0 right-0 bg-stone-900 border-t border-stone-800 p-2 flex justify-around items-center h-20 z-30">
               <button onClick={() => {triggerSfx('click'); setActiveTab('shop')}} className={`flex flex-col items-center p-2 w-16 ${activeTab === 'shop' ? 'text-white' : 'text-stone-600'}`}><ShoppingBag size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('shop')}</span></button>
               <button onClick={() => {triggerSfx('click'); setActiveTab('play')}} className="flex flex-col items-center justify-center w-14 h-14 bg-red-600 rounded-full -mt-8 shadow-[0_0_20px_rgba(220,38,38,0.4)] border-4 border-stone-900 text-white overflow-hidden transform transition active:scale-95"><Sword size={24}/></button>
-              <button onClick={() => {triggerSfx('click'); setActiveTab('profile')}} className={`flex flex-col items-center p-2 w-16 ${(activeTab === 'profile' || activeTab === 'zones' || activeTab === 'bestiary') ? 'text-white' : 'text-stone-600'}`}><User size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('profile')}</span></button>
+              <button onClick={() => {triggerSfx('click'); setActiveTab('profile')}} className={`flex flex-col items-center p-2 w-16 ${(activeTab === 'profile' || activeTab === 'bestiary' || activeTab === 'zones') ? 'text-white' : 'text-stone-600'}`}><User size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('profile')}</span></button>
            </div>
         )}
 

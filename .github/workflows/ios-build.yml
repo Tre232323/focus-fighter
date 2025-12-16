@@ -30,17 +30,15 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
           
-          # Nettoyage
+          # Nettoyage et Initialisation propre
           rm -rf ios
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation
-          # IMPORTANT : Assurez-vous que "com.tonnom.focusfighter" correspond EXACTEMENT 
-          # à l'Identifiant (App ID) que vous avez créé sur le site Apple Developer.
+          # Initialisation (Remplacez l'ID si nécessaire)
           npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
           
-          # Ajout iOS
+          # Ajout de la plateforme iOS
           npx cap add ios
           
           # Synchronisation
@@ -76,17 +74,12 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
 
-          # --- FIX SIGNATURE : Extraction automatique des IDs ---
-          # On lit le fichier .mobileprovision pour trouver l'UUID et le TeamID
+          # Extraction automatique des IDs
           UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i $PP_PATH))
           TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(security cms -D -i $PP_PATH))
           
-          # On les sauvegarde pour l'étape suivante
           echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
-          
-          echo "Profil UUID extrait: $UUID"
-          echo "Team ID extrait: $TEAM_ID"
 
       # Compilation avec Xcode
       - name: Build IPA
@@ -96,7 +89,7 @@ jobs:
           # Fichier d'options d'export
           cat <<EOF > exportOptions.plist
           <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "[http://www.apple.com/DTDs/PropertyList-1.0.dtd](http://www.apple.com/DTDs/PropertyList-1.0.dtd)">
           <plist version="1.0">
           <dict>
               <key>method</key>
@@ -110,7 +103,7 @@ jobs:
           </plist>
           EOF
 
-          # Construction de l'archive (Signature Manuelle avec les IDs extraits)
+          # Construction de l'archive
           xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
@@ -129,9 +122,17 @@ jobs:
             -exportPath $PWD/build \
             -allowProvisioningUpdates
 
-      # Sauvegarder le fichier IPA généré
-      - name: Upload IPA
+      # Sauvegarder le fichier IPA généré sur GitHub (Au cas où)
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app
           path: ios/App/build/App.ipa
+
+      # Envoi Automatique vers l'App Store (TestFlight)
+      - name: Upload to App Store Connect
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          PASS: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "$APPLE_ID" -p "$PASS"

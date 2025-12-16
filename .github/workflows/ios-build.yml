@@ -35,13 +35,13 @@ jobs:
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation (Remplacez l'ID si nécessaire)
+          # Initialisation
           npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
           
           # Ajout de la plateforme iOS
           npx cap add ios
           
-          # Synchronisation
+          # Synchronisation automatique
           npx cap sync ios
 
       # Installation des Certificats et Extraction des IDs
@@ -86,24 +86,14 @@ jobs:
         run: |
           cd ios/App
           
-          # Fichier d'options d'export
-          cat <<EOF > exportOptions.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "[http://www.apple.com/DTDs/PropertyList-1.0.dtd](http://www.apple.com/DTDs/PropertyList-1.0.dtd)">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.tonnom.focusfighter</key>
-                  <string>${{ env.PROFILE_UUID }}</string>
-              </dict>
-          </dict>
-          </plist>
-          EOF
-
-          # Construction de l'archive
+          # --- FIX EXPORT PLIST : Génération via PlistBuddy (Plus robuste) ---
+          # On crée le fichier proprement au lieu de l'écrire en texte
+          /usr/libexec/PlistBuddy -c "Add :method string app-store" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${{ env.TEAM_ID }}" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.tonnom.focusfighter string ${{ env.PROFILE_UUID }}" exportOptions.plist
+          
+          # Archive
           xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
@@ -115,24 +105,24 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CODE_SIGN_STYLE="Manual"
 
-          # Export en fichier IPA
+          # Export IPA
           xcodebuild -exportArchive \
             -archivePath $PWD/build/App.xcarchive \
             -exportOptionsPlist exportOptions.plist \
             -exportPath $PWD/build \
             -allowProvisioningUpdates
 
-      # Sauvegarder le fichier IPA généré sur GitHub (Au cas où)
+      # Sauvegarder le fichier IPA généré sur GitHub
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-app
           path: ios/App/build/App.ipa
 
-      # Envoi Automatique vers l'App Store (TestFlight)
+      # Envoi Automatique vers l'App Store Connect
       - name: Upload to App Store Connect
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          PASS: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_ID: ${{ secrets.edis@live.fr }}
+          PASS: ${{ secrets.Ktscsc23. }}
         run: |
           xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "$APPLE_ID" -p "$PASS"

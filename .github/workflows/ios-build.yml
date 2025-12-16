@@ -29,7 +29,19 @@ jobs:
       - name: Install & Sync Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
+          
+          # --- CORRECTIF : Forcer la configuration Capacitor ---
+          # On supprime toute config existante pour éviter les conflits
+          rm capacitor.config.ts || true
+          rm capacitor.config.json || true
+          
+          # On initialise proprement avec le bon ID (Remplacez com.tonnom.focusfighter par VOTRE ID si différent)
+          npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
+          
+          # On ajoute iOS (ignore l'erreur si existe déjà)
           npx cap add ios || true
+          
+          # On synchronise le tout
           npx cap sync ios
 
       # Installation des Certificats Apple sur le serveur GitHub

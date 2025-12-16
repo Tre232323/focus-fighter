@@ -15,10 +15,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22 # Mise à jour vers Node 22 pour Vite
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          npm install
+          # Force la version stable de Tailwind pour éviter les erreurs de build
+          npm install -D tailwindcss@3.4.17 postcss autoprefixer
 
       - name: Build Web App
         run: npm run build
@@ -84,4 +87,3 @@ jobs:
         with:
           name: ios-app
           path: ios/App/build/App.ipa
-

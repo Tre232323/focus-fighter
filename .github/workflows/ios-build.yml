@@ -119,11 +119,10 @@ jobs:
           name: ios-app
           path: ios/App/build/App.ipa
 
-      # Envoi Automatique vers l'App Store Connect
+      # Envoi Automatique vers l'App Store Connect (FIX : Utilisation de l'action dédiée)
       - name: Upload to App Store Connect
-        env:
-          # On utilise ici les NOMS des secrets, pas les valeurs directes
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          PASS: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: |
-          xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "$APPLE_ID" -p "$PASS"
+        uses: apple-actions/altool-upload@v1 
+        with:
+          file-path: ios/App/build/App.ipa
+          app-store-connect-username: ${{ secrets.APPLE_ID }}
+          app-store-connect-password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

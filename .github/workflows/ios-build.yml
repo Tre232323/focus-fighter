@@ -35,8 +35,8 @@ jobs:
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation
-          npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
+          # Initialisation (CHANGEMENT ICI)
+          npx cap init "Focus Fighter RPG" "com.tonnom.focusfighter" --web-dir dist
           
           # Ajout de la plateforme iOS
           npx cap add ios
@@ -122,4 +122,9 @@ jobs:
       # Envoi Automatique vers l'App Store Connect
       - name: Upload to App Store Connect (via altool)
         run: |
+          # --- AVERTISSEMENT CRITIQUE ---
+          # Si cette étape échoue avec "Failed to get authorization":
+          # 1. Vérifiez que APPLE_ID est votre adresse email Apple Developer.
+          # 2. Vérifiez que APPLE_APP_SPECIFIC_PASSWORD est le mot de passe généré
+          #    sur appleid.apple.com (il n'est PAS votre mot de passe principal).
           xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "${{ secrets.APPLE_ID }}" -p "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"

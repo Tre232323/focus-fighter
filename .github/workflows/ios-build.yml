@@ -41,13 +41,8 @@ jobs:
           # Ajout de la plateforme iOS
           npx cap add ios
           
-          # Synchronisation des assets
+          # Synchronisation (Gère les dépendances SPM automatiquement)
           npx cap sync ios
-
-          # --- FIX CRITIQUE : Installation manuelle des Pods ---
-          # C'est l'étape qui génère le fichier .xcworkspace manquant
-          cd ios/App
-          pod install --repo-update
 
       # Installation des Certificats Apple sur le serveur GitHub
       - name: Install Certificate and Profile
@@ -95,8 +90,8 @@ jobs:
           </plist>
           EOF
 
-          # Archive
-          xcodebuild -workspace App.xcworkspace \
+          # Archive (Utilisation de -project car pas de Workspace CocoaPods)
+          xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \

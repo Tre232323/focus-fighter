@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, Plus, X, User, Calendar, CheckCircle, Lock, BookOpen, Settings, Volume2, VolumeX, Flame, Hourglass, Globe, Download, Upload, Cat, Map, Hammer, ArrowRight, Pickaxe, Gem, Dna, Target, Crown, Video, Battery, EyeOff, AlertCircle, WifiOff } from 'lucide-react';
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react';
+
+// --- NOTES POUR L'INTÉGRATION MOBILE ---
+// Dans votre projet local, vous devez installer les dépendances suivantes :
+// npm install @capacitor/core @capacitor/ios @capacitor-community/admob
+
+// Import Capacitor pour détecter si on est sur iOS (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
+// import { Capacitor } from '@capacitor/core';
+
+// Import AdMob (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
+// import { AdMob, TrackingAuthorizationStatus } from '@capacitor-community/admob';
 
 // --- CONFIGURATION ADMOB ---
-const ADMOB_CONFIG = {
-  // Configuration pour Android (IDs de test Google pour éviter les bans accidentels)
-  android: {
-    appId: 'ca-app-pub-3940256099942544~3347511713',
-    bannerId: 'ca-app-pub-3940256099942544/6300978111',
-    rewardedId: 'ca-app-pub-3940256099942544/5224354917', 
-  },
-  // Configuration iOS (Vos vrais IDs)
-  ios: {
-    appId: 'ca-app-pub-5805757737293445~9154378744', 
-    bannerId: 'ca-app-pub-5805757737293445/5215133733',
-    rewardedId: 'ca-app-pub-5805757737293445/9629662095',
-  }
-};
+// Android App ID: ca-app-pub-5805757737293445~9154378744
+// Android Banner: ca-app-pub-5805757737293445/5215133733
+// Android Reward: ca-app-pub-5805757737293445/9629662095
 
 // --- AUDIO ENGINE ---
 const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
@@ -105,9 +104,7 @@ const playSfx = (type: string) => {
 
 // --- SAFE AD BANNER COMPONENT ---
 const SafeAdBanner = () => {
-  const [adError, setAdError] = useState(false);
-  if (adError) return null;
-
+  // In a real Capacitor app, checking for errors is handled by the plugin events
   return (
     <div className="bg-black border-t border-stone-800 h-[50px] w-full flex items-center justify-center relative overflow-hidden">
        <div className="text-stone-600 text-[10px] uppercase tracking-widest z-10">
@@ -184,7 +181,8 @@ const TEXTS = {
     ad_chest: "Coffre Pub", ad_chest_desc: "Regarder une vidéo pour 500 🪙",
     ad_revive: "Ressusciter", ad_revive_desc: "Regarder une pub pour continuer",
     battery_mode: "Mode Éco", battery_mode_on: "Toucher pour réveiller",
-    ad_error: "Erreur Pub: Récompense non attribuée", ad_loading: "Chargement Pub..."
+    ad_error: "Erreur Pub: Récompense non attribuée", ad_loading: "Chargement Pub...",
+    privacy_title: "Confidentialité iOS", privacy_desc: "Vérification..."
   },
   en: {
     play: "Play", shop: "Shop", profile: "Profile", bestiary: "Bestiary", talents: "Talents", zones: "Map",
@@ -210,7 +208,8 @@ const TEXTS = {
     ad_chest: "Ad Chest", ad_chest_desc: "Watch video for 500 🪙",
     ad_revive: "Revive", ad_revive_desc: "Watch ad to continue",
     battery_mode: "Eco Mode", battery_mode_on: "Tap to wake",
-    ad_error: "Ad Error: No reward given", ad_loading: "Loading Ad..."
+    ad_error: "Ad Error: No reward given", ad_loading: "Loading Ad...",
+    privacy_title: "iOS Privacy", privacy_desc: "Checking..."
   }
 };
 
@@ -285,13 +284,6 @@ const AMBIANCES = [
   { id: 'space', icon: "🌌", name: { fr: "Espace", en: "Space" }, bg: "bg-indigo-950" },
 ];
 
-const ACHIEVEMENTS = [
-  { id: 'novice', target: 60, type: 'minutes', reward: 150, icon: "⏱️", name: { fr: "Novice", en: "Novice" }, desc: { fr: "60 min de focus", en: "60 min focus" } },
-  { id: 'expert', target: 300, type: 'minutes', reward: 500, icon: "⌛", name: { fr: "Expert", en: "Expert" }, desc: { fr: "300 min de focus", en: "300 min focus" } },
-  { id: 'slayer', target: 50, type: 'kills', reward: 500, icon: "🗡️", name: { fr: "Chasseur", en: "Slayer" }, desc: { fr: "Vaincre 50 monstres", en: "Kill 50 monsters" } },
-  { id: 'rich', target: 5000, type: 'gold', reward: 1000, icon: "💰", name: { fr: "Économe", en: "Thrifty" }, desc: { fr: "5000 pièces d'or", en: "5000 gold pieces" } },
-];
-
 function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(() => {
     try {
@@ -334,7 +326,7 @@ export default function App() {
   const [ambianceEnabled, setAmbianceEnabled] = useStickyState(false, 'ff_ambiance');
 
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'defeat'>('menu');
-  const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones'>('play');
+  const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones' | 'bestiary'>('play');
   const [shopTab, setShopTab] = useState<'weapons' | 'items' | 'pets'>('weapons');
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -396,6 +388,12 @@ export default function App() {
     return () => toggleAmbiance(false, 'silence');
   }, [gameState, ambianceEnabled, currentAmbiance]);
 
+  // iOS Tracking Request
+  useEffect(() => {
+    // Note: This needs @capacitor-community/admob to function in a real app
+    console.log("Tracking request hook ready");
+  }, []);
+
   const triggerSfx = (type: string) => { if (sfxEnabled) playSfx(type); };
 
   const spawnParticles = (count: number) => {
@@ -413,12 +411,9 @@ export default function App() {
     if (isAdLoading) return;
     setIsAdLoading(true);
     
-    // In a real app, you would call AdMob.showRewardVideoAd()
-    // Here we simulate it with failsafe logic
     const simulateAdCall = new Promise((resolve, reject) => {
       setTimeout(() => {
-        // 90% chance success simulation
-        Math.random() > 0.1 ? resolve(true) : reject("Network Error or No Fill");
+        Math.random() > 0.1 ? resolve(true) : reject("AdMob Error");
       }, 2000);
     });
 
@@ -732,6 +727,7 @@ export default function App() {
               <div className="space-y-4">
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Globe size={14} className="mr-2"/> {t('lang_select')}</div><button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="text-xs font-bold bg-stone-700 px-2 py-1 rounded">{lang.toUpperCase()}</button></div>
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Volume2 size={14} className="mr-2"/> {t('sfx')}</div><button onClick={() => setSfxEnabled(!sfxEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${sfxEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${sfxEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
+                 <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div><button onClick={() => setAmbianceEnabled(!ambianceEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${ambianceEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ambianceEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
               </div>
               <div className="pt-4 border-t border-stone-700 space-y-2 mt-4">
                  <button onClick={exportSave} className="w-full flex items-center justify-center text-xs bg-stone-700 hover:bg-stone-600 py-2 rounded text-stone-300"><Upload size={12} className="mr-2"/> {t('save_export')}</button>

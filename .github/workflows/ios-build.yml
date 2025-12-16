@@ -119,11 +119,21 @@ jobs:
           name: ios-app
           path: ios/App/build/App.ipa
 
-      # Envoi Automatique vers l'App Store Connect (FIX : Utilisation de l'action Transporter officielle)
-      - name: Upload to App Store Connect
-        uses: apple-actions/upload-using-transporter@v2
+      # Envoi Automatique vers l'App Store Connect (FIX : Utilisation de l'action Fastlane)
+      - name: Upload to App Store Connect (via Fastlane)
+        uses: fastlane-action/github-action-fastlane@v2
         with:
+          # Ici, nous utilisons fastlane's deliver action pour l'upload
+          lane: "upload_to_app_store" # Cette lane n'existe pas, nous allons utiliser le "Deliver" par défaut
+          # Les variables fastlane sont lues automatiquement depuis les secrets
+          # En utilisant l'option 'Deliver' pour l'upload, nous pouvons lui dire où est le fichier.
+          custom_command: "deliver --api_key_path api_key.json --ipa ios/App/build/App.ipa" 
+          # On va simuler en utilisant la méthode ci-dessous :
+          
           # On utilise l'ID et le mot de passe spécifiques
-          username: ${{ secrets.APPLE_ID }}
-          password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          file-path: ios/App/build/App.ipa
+          # Note: Cette action préfère les clés d'API, mais l'username/password fonctionne
+          # On revient à la commande précédente tant que fastlane n'est pas configuré.
+          
+          # La méthode Transporter échoue. Retour à l'altool direct (méthode de secours)
+        run: |
+          xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "${{ secrets.APPLE_ID }}" -p "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"

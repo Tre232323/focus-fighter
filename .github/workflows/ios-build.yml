@@ -29,24 +29,18 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
           
-          # Nettoyage préventif
+          # Nettoyage et Initialisation propre
           rm -rf ios
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation
+          # Initialisation (Remplacez l'ID si nécessaire)
           npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
           
-          # Ajout iOS
+          # Ajout de la plateforme iOS
           npx cap add ios
           
-          # --- FIX EXPLICITE : Forcer la génération du Workspace ---
-          # On entre dans le dossier iOS et on installe les dépendances natives manuellement
-          cd ios/App
-          pod install --repo-update
-          
-          # On revient à la racine pour la suite
-          cd ../..
+          # Synchronisation automatique (Gère les Pods et le Workspace tout seul)
           npx cap sync ios
 
       # Installation des Certificats Apple sur le serveur GitHub
@@ -104,3 +98,4 @@ jobs:
         with:
           name: ios-app
           path: ios/App/build/App.ipa
+```

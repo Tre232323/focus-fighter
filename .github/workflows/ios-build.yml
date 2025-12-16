@@ -30,21 +30,23 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
           
-          # Nettoyage et Initialisation propre
+          # Nettoyage
           rm -rf ios
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation (Remplacez l'ID si nécessaire)
+          # Initialisation
+          # IMPORTANT : Assurez-vous que "com.tonnom.focusfighter" correspond EXACTEMENT 
+          # à l'Identifiant (App ID) que vous avez créé sur le site Apple Developer.
           npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
           
-          # Ajout de la plateforme iOS
+          # Ajout iOS
           npx cap add ios
           
-          # Synchronisation (Gère les dépendances SPM automatiquement)
+          # Synchronisation
           npx cap sync ios
 
-      # Installation des Certificats Apple sur le serveur GitHub
+      # Installation des Certificats et Extraction des IDs
       - name: Install Certificate and Profile
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -52,33 +54,46 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Créer les fichiers à partir des secrets
+          # Création des chemins
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           PP_PATH=$RUNNER_TEMP/build_profile.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
+          # Décodage des secrets
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
           echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
 
-          # Créer un trousseau temporaire
+          # Création du trousseau
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-          # Importer le certificat
+          # Import du certificat
           security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Appliquer le profil
+          # Copie du profil
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+
+          # --- FIX SIGNATURE : Extraction automatique des IDs ---
+          # On lit le fichier .mobileprovision pour trouver l'UUID et le TeamID
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i $PP_PATH))
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(security cms -D -i $PP_PATH))
+          
+          # On les sauvegarde pour l'étape suivante
+          echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
+          
+          echo "Profil UUID extrait: $UUID"
+          echo "Team ID extrait: $TEAM_ID"
 
       # Compilation avec Xcode
       - name: Build IPA
         run: |
           cd ios/App
           
-          # Création du fichier exportOptions.plist (Requis pour l'export IPA)
+          # Fichier d'options d'export
           cat <<EOF > exportOptions.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -86,22 +101,28 @@ jobs:
           <dict>
               <key>method</key>
               <string>app-store</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.tonnom.focusfighter</key>
+                  <string>${{ env.PROFILE_UUID }}</string>
+              </dict>
           </dict>
           </plist>
           EOF
 
-          # Archive (Utilisation de -project car pas de Workspace CocoaPods)
+          # Construction de l'archive (Signature Manuelle avec les IDs extraits)
           xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
             -archivePath $PWD/build/App.xcarchive \
             clean archive \
-            PROVISIONING_PROFILE_SPECIFIER="" \
+            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}" \
+            DEVELOPMENT_TEAM="${{ env.TEAM_ID }}" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CODE_SIGN_STYLE="Manual"
 
-          # Export IPA
+          # Export en fichier IPA
           xcodebuild -exportArchive \
             -archivePath $PWD/build/App.xcarchive \
             -exportOptionsPlist exportOptions.plist \

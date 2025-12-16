@@ -15,12 +15,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Mise à jour vers Node 22 pour Vite
+          node-version: 22
 
       - name: Install Dependencies
         run: |
           npm install
-          # Force la version stable de Tailwind pour éviter les erreurs de build
           npm install -D tailwindcss@3.4.17 postcss autoprefixer
 
       - name: Build Web App
@@ -30,18 +29,19 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/ios
           
-          # --- CORRECTIF : Forcer la configuration Capacitor ---
-          # On supprime toute config existante pour éviter les conflits
+          # --- CORRECTIF V6 : Nettoyage radical ---
+          # On supprime le dossier ios s'il existe pour forcer une création propre
+          rm -rf ios
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # On initialise proprement avec le bon ID (Remplacez com.tonnom.focusfighter par VOTRE ID si différent)
+          # Initialisation
           npx cap init "Focus Fighter" "com.tonnom.focusfighter" --web-dir dist
           
-          # On ajoute iOS (ignore l'erreur si existe déjà)
-          npx cap add ios || true
+          # Ajout iOS (ne doit plus échouer car le dossier est vide)
+          npx cap add ios
           
-          # On synchronise le tout
+          # Synchronisation
           npx cap sync ios
 
       # Installation des Certificats Apple sur le serveur GitHub

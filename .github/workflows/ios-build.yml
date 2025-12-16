@@ -119,10 +119,11 @@ jobs:
           name: ios-app
           path: ios/App/build/App.ipa
 
-      # Envoi Automatique vers l'App Store Connect (FIX : Utilisation de l'action dédiée)
+      # Envoi Automatique vers l'App Store Connect (FIX : Utilisation de l'action Transporter officielle)
       - name: Upload to App Store Connect
-        uses: apple-actions/altool-upload@v1 
+        uses: apple-actions/upload-using-transporter@v2
         with:
+          # On utilise l'ID et le mot de passe spécifiques
+          username: ${{ secrets.APPLE_ID }}
+          password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           file-path: ios/App/build/App.ipa
-          app-store-connect-username: ${{ secrets.APPLE_ID }}
-          app-store-connect-password: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

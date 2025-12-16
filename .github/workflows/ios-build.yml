@@ -122,7 +122,8 @@ jobs:
       # Envoi Automatique vers l'App Store Connect
       - name: Upload to App Store Connect
         env:
-          APPLE_ID: ${{ secrets.edis@live.fr }}
-          PASS: ${{ secrets.Ktscsc23. }}
+          # On utilise ici les NOMS des secrets, pas les valeurs directes
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          PASS: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
           xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "$APPLE_ID" -p "$PASS"

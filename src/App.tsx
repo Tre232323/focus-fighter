@@ -6,6 +6,8 @@ const REWARD_DAILY = 50;
 const REWARD_AD_CHEST = 350;
 
 // --- FIREBASE IMPORTS (FIX TS2307 & TS6133) ---
+// Note: Ces modules sont inclus par l'environnement Canvas à l'exécution,
+// mais nous devons les déclarer pour satisfaire le compilateur local (via l'export/import).
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -343,7 +345,6 @@ const MONSTERS = [
   { id: 'shadow', baseHp: 30000, xp: 1500, color: "text-gray-900", name: { fr: "Ombre", en: "Shadow" }, lore: { fr: "Votre pire ennemi.", en: "Your worst enemy." } },
   { id: 'beholder', baseHp: 45000, xp: 2000, color: "text-purple-300", name: { fr: "Observateur", en: "Beholder" }, lore: { fr: "Il voit tout.", en: "Sees all." } },
   { id: 'cultist', baseHp: 60000, xp: 2500, color: "text-red-900", name: { fr: "Cultiste", en: "Cultist" }, lore: { fr: "Fou.", en: "Mad." } },
-  { id: 'cthulhu', baseHp: 100000, xp: 4000, color: "text-green-900", name: { fr: "Ancien", en: "Ancient One" }, lore: { fr: "Indescriptible.", en: "Indescribable." } },
   { id: 'demon', baseHp: 250000, xp: 10000, color: "text-red-950", name: { fr: "Roi Démon", en: "Demon King" }, lore: { fr: "Le boss final.", en: "The final boss." } },
 ];
 
@@ -682,7 +683,7 @@ export default function App() {
   }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterId]);
 
   const handleMonsterKill = () => {
-    const killedMonster = MONSTERS[currentMonsterIndex];
+    const killedMonster = currentMonster;
     setSessionKills(k => k + 1);
     
     setCombo(c => Math.min(c + 1, 10)); 

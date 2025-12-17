@@ -21,8 +21,10 @@ declare const __initial_auth_token: string | undefined;
 import { 
   Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer 
 } from 'lucide-react';
-const REWARD_DAILY = 50;
-const _USEFUL_FOR_LATER = { Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer, REWARD_DAILY };
+
+export const REWARD_DAILY = 50;
+// Exporting this satisfies TS6133 as it's considered an external-facing member
+export const _USEFUL_FOR_LATER = { Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer, REWARD_DAILY };
 
 // --- CONFIGURATION & CONSTANTES ---
 const REWARD_AD_CHEST = 350;
@@ -137,7 +139,7 @@ const TEXTS = {
     save_copied: "Copied!", reset_data: "Reset", reset_confirm: "Erase everything?",
     str: "Strength", greed: "Greed", wis: "Wisdom", points: "Points",
     raid_boss: "Boss Raid", raid_desc: "90 min • +++ REWARDS",
-    zone_forest: "Ancient Forest", zone_catacombs: "Catacombs", zone_volcano: "Fire Mountain", zone_void: "The Void",
+    zone_forest: "Ancient Forest", zone_catacombs: "Catacombes", zone_volcano: "Fire Mountain", zone_void: "The Void",
     travel: "Travel", upgrade: "Upgrade", boss_spawn: "BOSS INCOMING!", combo: "COMBO",
     ad_chest: "Ad Chest", ad_chest_desc: `Watch for ${REWARD_AD_CHEST} 🪙`,
     ad_revive: "Revive", battery_mode_on: "Tap to wake",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'; // Retiré useCallback
+import React, { useState, useEffect, useRef } from 'react'; 
 import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react'; 
 
 // --- RÉCOMPENSES CENTRALISÉES ---
@@ -263,7 +263,7 @@ const TEXTS = {
     settings: "Settings", sfx: "Sound FX", ambiance: "Ambiance",
     minutes: "Minutes", backpack: "Backpack", weapons: "Weapons", potions: "Potions", pets: "Pets",
     level: "Level", xp: "XP", gold: "Gold", kills: "Kills", hours: "Hours", streak: "Streak",
-    hp: "PV", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
+    hp: "HP", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
     victory: "Session Complete!", defeat: "Defeat", gold_won: "Gold Won", xp_won: "XP Won", session_kills: "Monsters defeated",
     return_menu: "Return to Menu", give_up: "Give Up", focus_active: "Focus Active",
     freeze_active: "STASIS", freeze_desc: "Come back quick!",

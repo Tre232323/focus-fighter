@@ -5,11 +5,13 @@ import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, 
 const REWARD_DAILY = 50;
 const REWARD_AD_CHEST = 350;
 
-// --- FIREBASE IMPORTS (FIX TS2307 & TS6133) ---
-// Note: Ces modules sont inclus par l'environnement Canvas à l'exécution,
-// mais nous devons les déclarer pour satisfaire le compilateur local (via l'export/import).
+// --- FIREBASE IMPORTS (Neutralisation pour la compilation locale) ---
+// Le code d'exécution utilisera ces modules via l'environnement Canvas.
+// @ts-ignore
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+// @ts-ignore
 import { getAuth, Auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+// @ts-ignore
 import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
 
 // --- DÉCLARATIONS GLOBALES (FIX TS2552 & TS2304) ---
@@ -37,12 +39,12 @@ const firebaseConfig = {
 const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
 const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : finalFirebaseConfig.projectId;
 
-let firebaseApp: FirebaseApp | null = null;
+let firebaseApp: any = null; // Type neutralisé
 if (getApps().length === 0 && Object.keys(finalFirebaseConfig).length > 0) {
   firebaseApp = initializeApp(finalFirebaseConfig);
 }
-const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
-const auth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
+const db: any = firebaseApp ? getFirestore(firebaseApp) : null; // Type neutralisé
+const auth: any = firebaseApp ? getAuth(firebaseApp) : null; // Type neutralisé
 
 // --- GOOGLE ANALYTICS (GA4) CONFIGURATION ---
 const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // "G-2MY7J82JBN"
@@ -59,15 +61,12 @@ const gtag = (action: string, params: Record<string, any>) => {
 
 // --- AUDIO ENGINE AMBIANCE (SONS RÉELS BASE64) ---
 const AMBIANCE_SOUNDS: Record<string, string> = {
-    // NOTE: REMPLACEZ LES URLS CI-DESSOUS par de vrais sons .wav ou .mp3 encodés en Base64
-    // Le code tentera de décoder ces données au lieu de générer du bruit.
-    // Laissez vide (ou supprimez la clé) pour revenir à la génération de bruit procédural.
     rain: 'uploaded:249948__illusiaproductions__heavy-rain-hitting-the-roof-wind-occasional-thunder.wav', 
     fire: 'uploaded:483305__craigsmith__r09-59-clicking-fire.wav',
     wind: 'uploaded:348167__klankbeeld__room-tone-wind-6bft-150518_03.wav',
     river: 'uploaded:685920__klankbeeld__boulevard-river-amer-1.wav',
-    brown: '', // Pas de son réel fourni, utilisera le fallback procédural
-    space: 'uploaded:41479__jovica__ezerbee-deep-space-drone-aaaaa.flac', // Attention au format FLAC
+    brown: '', 
+    space: 'uploaded:41479__jovica__ezerbee-deep-space-drone-aaaaa.flac', 
 };
 
 const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
@@ -87,7 +86,6 @@ const initAudio = () => {
 };
 
 const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type: string, volume: number) => {
-    // Si ce sont des IDs de fichiers Canvas, on simule l'accès aux données.
     if (audioData.startsWith('uploaded:')) {
       console.warn("Utilisation du fallback procédural car les données Base64 réelles ne sont pas disponibles dans AMBIANCE_SOUNDS.");
       startProceduralAmbiance(ctx, type, volume);
@@ -105,7 +103,6 @@ const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type
     ambianceNode.loop = true;
     ambianceGain = ctx.createGain();
     
-    // Appliquer le volume
     ambianceGain.gain.value = volume;
 
     const filter = ctx.createBiquadFilter();
@@ -121,7 +118,6 @@ const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type
 };
 
 const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number) => {
-    // Logique de génération de bruit (bruit blanc filtré)
     const bufferSize = ctx.sampleRate * 2;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -140,7 +136,6 @@ const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number
     ambianceNode.loop = true;
     ambianceGain = ctx.createGain();
     
-    // Appliquer le volume (plus faible par défaut pour le bruit blanc)
     ambianceGain.gain.value = volume * 0.1;
 
     const filter = ctx.createBiquadFilter();
@@ -295,7 +290,7 @@ const TEXTS = {
     settings: "Settings", sfx: "Sound FX", ambiance: "Ambiance",
     minutes: "Minutes", backpack: "Backpack", weapons: "Weapons", potions: "Potions", pets: "Pets",
     level: "Level", xp: "XP", gold: "Gold", kills: "Kills", hours: "Hours", streak: "Streak",
-    hp: "HP", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
+    hp: "PV", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
     victory: "Session Complete!", defeat: "Defeat", gold_won: "Gold Won", xp_won: "XP Won", session_kills: "Monsters defeated",
     return_menu: "Return to Menu", give_up: "Give Up", focus_active: "Focus Active",
     freeze_active: "STASIS", freeze_desc: "Come back quick!",
@@ -345,6 +340,7 @@ const MONSTERS = [
   { id: 'shadow', baseHp: 30000, xp: 1500, color: "text-gray-900", name: { fr: "Ombre", en: "Shadow" }, lore: { fr: "Votre pire ennemi.", en: "Your worst enemy." } },
   { id: 'beholder', baseHp: 45000, xp: 2000, color: "text-purple-300", name: { fr: "Observateur", en: "Beholder" }, lore: { fr: "Il voit tout.", en: "Sees all." } },
   { id: 'cultist', baseHp: 60000, xp: 2500, color: "text-red-900", name: { fr: "Cultiste", en: "Cultist" }, lore: { fr: "Fou.", en: "Mad." } },
+  { id: 'cthulhu', baseHp: 100000, xp: 4000, color: "text-green-900", name: { fr: "Ancien", en: "Ancient One" }, lore: { fr: "Indescriptible.", en: "Indescribable." } },
   { id: 'demon', baseHp: 250000, xp: 10000, color: "text-red-950", name: { fr: "Roi Démon", en: "Demon King" }, lore: { fr: "Le boss final.", en: "The final boss." } },
 ];
 

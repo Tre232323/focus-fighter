@@ -789,6 +789,12 @@ export default function App() {
         {/* HEADER */}
         <div className="bg-stone-900 p-3 border-b border-stone-800 z-20 flex justify-between items-center">
            <div className="flex items-center space-x-2">
+              {/* LOGO INSERTION ICI */}
+              <img 
+                 src="Gemini_Generated_Image_4fbxlw4fbxlw4fbx.jpg" 
+                 alt="Focus Fighter RPG Logo" 
+                 className="w-8 h-8 rounded-lg shadow-md border border-red-800"
+              />
               <div className="w-8 h-8 bg-stone-700 rounded-full flex items-center justify-center font-bold text-xs border border-stone-500 relative">
                  {playerLevel}
                  {streakDays > 0 && <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-[8px] rounded-full w-4 h-4 flex items-center justify-center border border-stone-900"><Flame size={8} fill="white" /></div>}

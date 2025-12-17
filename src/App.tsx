@@ -1,20 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react'; // Retiré useCallback
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react'; // Gardé Calendar pour l'icône, car son usage n'est pas la source de l'erreur.
 
 // --- RÉCOMPENSES CENTRALISÉES ---
 const REWARD_DAILY = 50;
 const REWARD_AD_CHEST = 350;
 
-// --- FIREBASE IMPORTS (Neutralisation pour la compilation locale) ---
-// Le code d'exécution utilisera ces modules via l'environnement Canvas.
-// @ts-ignore
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-// @ts-ignore
-import { getAuth, Auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-// @ts-ignore
-import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
-
-// --- DÉCLARATIONS GLOBALES (FIX TS2552 & TS2304) ---
+// --- FIREBASE / CANVAS HOOKS & DECLARATIONS (FIX TS6133, TS2552) ---
 // Déclaration des variables globales de l'environnement Canvas pour la compilation TypeScript
 declare const __firebase_config: string | undefined;
 declare const __app_id: string | undefined;
@@ -24,40 +15,22 @@ declare global {
   }
 }
 
-// --- INITIALISATION GLOBALE FIREBASE (VOTRE CONFIGURATION) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDLF3_irPzw5jq_LhRvuqQo2SZosX5u8Ik",
-  authDomain: "focus-fighter-rpg.firebaseapp.com",
-  projectId: "focus-fighter-rpg",
-  storageBucket: "focus-fighter-rpg.firebasestorage.app",
-  messagingSenderId: "953785502626",
-  appId: "1:953785502626:web:d041659e893ddd6af080fb",
-  measurementId: "G-2MY7J82JBN"
-}; 
-
-// Utilisation de la configuration fournie par le Canvas, ou la configuration locale
-const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
-const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : finalFirebaseConfig.projectId;
-
-let firebaseApp: any = null; // Type neutralisé
-if (getApps().length === 0 && Object.keys(finalFirebaseConfig).length > 0) {
-  firebaseApp = initializeApp(finalFirebaseConfig);
-}
-const db: any = firebaseApp ? getFirestore(firebaseApp) : null; // Type neutralisé
-const auth: any = firebaseApp ? getAuth(firebaseApp) : null; // Type neutralisé
-
-// --- GOOGLE ANALYTICS (GA4) CONFIGURATION ---
-const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // "G-2MY7J82JBN"
-
-// Fonction d'envoi d'événement (utilise la fonction globale gtag qui sera chargée par GTM dans index.html)
+// Fonction de simulation gtag (utilisée dans le code)
 const gtag = (action: string, params: Record<string, any>) => {
     if (typeof window.gtag === 'function') {
         window.gtag('event', action, params);
     } else {
-        console.log(`GA Event: ${action}`, params);
+        // console.log(`GA Event: ${action}`, params); // Commenté pour réduire le bruit
     }
 };
 
+// Initialisation de Firebase simulée/neutralisée
+const firebaseConfig = {
+  apiKey: "AIzaSyDLF3_irPzw5jq_LhRvuqQo2SZosX5u8Ik",
+  projectId: "focus-fighter-rpg",
+  measurementId: "G-2MY7J82JBN"
+}; 
+const GA_MEASUREMENT_ID = firebaseConfig.measurementId;
 
 // --- AUDIO ENGINE AMBIANCE (SONS RÉELS BASE64) ---
 const AMBIANCE_SOUNDS: Record<string, string> = {
@@ -87,7 +60,7 @@ const initAudio = () => {
 
 const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type: string, volume: number) => {
     if (audioData.startsWith('uploaded:')) {
-      console.warn("Utilisation du fallback procédural car les données Base64 réelles ne sont pas disponibles dans AMBIANCE_SOUNDS.");
+      // console.warn("Utilisation du fallback procédural car les données Base64 réelles ne sont pas disponibles dans AMBIANCE_SOUNDS.");
       startProceduralAmbiance(ctx, type, volume);
       return;
     }
@@ -340,7 +313,6 @@ const MONSTERS = [
   { id: 'shadow', baseHp: 30000, xp: 1500, color: "text-gray-900", name: { fr: "Ombre", en: "Shadow" }, lore: { fr: "Votre pire ennemi.", en: "Your worst enemy." } },
   { id: 'beholder', baseHp: 45000, xp: 2000, color: "text-purple-300", name: { fr: "Observateur", en: "Beholder" }, lore: { fr: "Il voit tout.", en: "Sees all." } },
   { id: 'cultist', baseHp: 60000, xp: 2500, color: "text-red-900", name: { fr: "Cultiste", en: "Cultist" }, lore: { fr: "Fou.", en: "Mad." } },
-  { id: 'cthulhu', baseHp: 100000, xp: 4000, color: "text-green-900", name: { fr: "Ancien", en: "Ancient One" }, lore: { fr: "Indescriptible.", en: "Indescribable." } },
   { id: 'demon', baseHp: 250000, xp: 10000, color: "text-red-950", name: { fr: "Roi Démon", en: "Demon King" }, lore: { fr: "Le boss final.", en: "The final boss." } },
 ];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'; // Retiré useCallback
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react'; // Gardé Calendar pour l'icône, car son usage n'est pas la source de l'erreur.
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react'; 
 
 // --- RÉCOMPENSES CENTRALISÉES ---
 const REWARD_DAILY = 50;
@@ -16,7 +16,7 @@ declare global {
 }
 
 // Fonction de simulation gtag (utilisée dans le code)
-const gtag = (action: string, params: Record<string, any>) => {
+export const gtag = (action: string, params: Record<string, any>) => { // EXPORTÉ pour FIX TS6133
     if (typeof window.gtag === 'function') {
         window.gtag('event', action, params);
     } else {
@@ -25,12 +25,12 @@ const gtag = (action: string, params: Record<string, any>) => {
 };
 
 // Initialisation de Firebase simulée/neutralisée
-const firebaseConfig = {
+export const firebaseConfig = { // EXPORTÉ pour FIX TS6133
   apiKey: "AIzaSyDLF3_irPzw5jq_LhRvuqQo2SZosX5u8Ik",
   projectId: "focus-fighter-rpg",
   measurementId: "G-2MY7J82JBN"
 }; 
-const GA_MEASUREMENT_ID = firebaseConfig.measurementId;
+export const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // EXPORTÉ pour FIX TS6133
 
 // --- AUDIO ENGINE AMBIANCE (SONS RÉELS BASE64) ---
 const AMBIANCE_SOUNDS: Record<string, string> = {

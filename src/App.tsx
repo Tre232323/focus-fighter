@@ -5,10 +5,20 @@ import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, 
 const REWARD_DAILY = 50;
 const REWARD_AD_CHEST = 350;
 
-// --- FIREBASE IMPORTS (Nécessaires pour le Canvas) ---
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+// --- FIREBASE IMPORTS (FIX TS2307 & TS6133) ---
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, Firestore, doc, setDoc, getDoc } from 'firebase/firestore';
+
+// --- DÉCLARATIONS GLOBALES (FIX TS2552 & TS2304) ---
+// Déclaration des variables globales de l'environnement Canvas pour la compilation TypeScript
+declare const __firebase_config: string | undefined;
+declare const __app_id: string | undefined;
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+  }
+}
 
 // --- INITIALISATION GLOBALE FIREBASE (VOTRE CONFIGURATION) ---
 const firebaseConfig = {
@@ -23,17 +33,16 @@ const firebaseConfig = {
 
 // Utilisation de la configuration fournie par le Canvas, ou la configuration locale
 const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
-const appId = typeof __app_id !== 'undefined' ? __app_id : finalFirebaseConfig.projectId;
+const canvasAppId = typeof __app_id !== 'undefined' ? __app_id : finalFirebaseConfig.projectId;
 
-// Initialisation de Firebase
+let firebaseApp: FirebaseApp | null = null;
 if (getApps().length === 0 && Object.keys(finalFirebaseConfig).length > 0) {
-  initializeApp(finalFirebaseConfig);
+  firebaseApp = initializeApp(finalFirebaseConfig);
 }
-const db = getApps().length > 0 ? getFirestore(getApps()[0]) : null;
-const auth = getApps().length > 0 ? getAuth(getApps()[0]) : null;
+const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
+const auth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
 
 // --- GOOGLE ANALYTICS (GA4) CONFIGURATION ---
-// ID de mesure réel intégré à la configuration Firebase ci-dessus.
 const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // "G-2MY7J82JBN"
 
 // Fonction d'envoi d'événement (utilise la fonction globale gtag qui sera chargée par GTM dans index.html)
@@ -421,8 +430,10 @@ export default function App() {
   const [ambianceEnabled, setAmbianceEnabled] = useStickyState(false, 'ff_ambiance');
   const [ambianceVolume, setAmbianceVolume] = useStickyState(0.5, 'ff_ambiance_volume'); // NOUVEAU: Volume de l'ambiance
 
+  // FIX TS2367: Ajout de 'bestiary' et 'zones' aux types de 'activeTab'
+  type TabType = 'play' | 'shop' | 'profile' | 'zones' | 'bestiary'; 
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'defeat'>('menu');
-  const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones'>('play');
+  const [activeTab, setActiveTab] = useState<TabType>('play');
   const [shopTab, setShopTab] = useState<'weapons' | 'items' | 'pets'>('weapons');
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -444,7 +455,10 @@ export default function App() {
   const [freezeTimeLeft, setFreezeTimeLeft] = useState(0);
   const [isFrozen, setIsFrozen] = useState(false);
 
-  const [currentMonsterIndex, setCurrentMonsterIndex] = useState(0);
+  // FIX: Retiré l'état currentMonsterIndex car la logique utilise currentMonsterId
+  const [currentMonsterId, setCurrentMonsterId] = useState<string>('slime');
+  const currentMonster = MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0];
+  
   const [monsterCurrentHp, setMonsterCurrentHp] = useState(100);
   const [isAttacking, setIsAttacking] = useState(false);
   const [isHit, setIsHit] = useState(false);
@@ -458,7 +472,8 @@ export default function App() {
   const freezeIntervalRef = useRef<number | null>(null);
   const comboIntervalRef = useRef<number | null>(null);
   
-  const monster = MONSTERS[currentMonsterIndex];
+  // FIX: Utiliser currentMonsterId au lieu de currentMonsterIndex dans les dépendances
+  const monster = currentMonster; 
   const weapon = WEAPONS[currentWeapon];
   const weaponLvl = weaponLevels[currentWeapon] || 0;
   const activePetObj = PETS.find(p => p.id === equippedPet);
@@ -477,7 +492,7 @@ export default function App() {
 
   // METTRE À JOUR LE VOLUME QUAND L'ÉTAT CHANGE
   useEffect(() => {
-    if (ambianceGain) {
+    if (ambianceGain && ambianceGain.gain) {
       ambianceGain.gain.value = ambianceVolume;
     }
   }, [ambianceVolume]);
@@ -583,7 +598,8 @@ export default function App() {
     setShinyType(type);
 
     let nextIdx = pickRandomMonsterForZone();
-    setCurrentMonsterIndex(nextIdx);
+    // Utilisation de l'index pour trouver l'ID
+    setCurrentMonsterId(MONSTERS[nextIdx].id);
     
     const nextMonster = MONSTERS[nextIdx];
     let hp = nextMonster.baseHp;
@@ -663,7 +679,7 @@ export default function App() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterIndex]);
+  }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterId]);
 
   const handleMonsterKill = () => {
     const killedMonster = MONSTERS[currentMonsterIndex];

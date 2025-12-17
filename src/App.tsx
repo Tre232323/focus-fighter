@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'; 
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X, Upload, Download } from 'lucide-react'; 
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Globe, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X, Upload, Download } from 'lucide-react'; 
 
 // --- RÉCOMPENSES CENTRALISÉES ---
 const REWARD_DAILY = 50;
@@ -227,7 +227,8 @@ const TEXTS = {
     monster_name: "Monstre", monster_lore: "Une créature hostile.",
     unknown: "Inconnu", unlock: "???",
     session_kills: "Kills Session", combo: "Combo",
-    talents: "Talents", travel: "Voyager", battery_mode_on: "Mode Économie Activé - Touchez pour désactiver"
+    talents: "Talents", travel: "Voyager", battery_mode_on: "Mode Économie Activé - Touchez pour désactiver",
+    upgrade: "Améliorer"
   },
   en: {
     play: "Play", shop: "Shop", profile: "Profile", bestiary: "Bestiary", zones: "Map",
@@ -248,7 +249,8 @@ const TEXTS = {
     monster_name: "Monster", monster_lore: "A hostile creature.",
     unknown: "Unknown", unlock: "???",
     session_kills: "Session Kills", combo: "Combo",
-    talents: "Talents", travel: "Travel", battery_mode_on: "Battery Mode On - Tap to disable"
+    talents: "Talents", travel: "Travel", battery_mode_on: "Battery Mode On - Tap to disable",
+    upgrade: "Upgrade"
   }
 };
 
@@ -342,7 +344,7 @@ export default function App() {
   const [gold, setGold] = useStickyState(0, 'ff_gold');
   const [currentWeapon, setCurrentWeapon] = useStickyState(0, 'ff_weapon');
   const [weaponLevels, setWeaponLevels] = useStickyState<Record<number, number>>({}, 'ff_weapon_levels');
-  const [inventory, setInventory] = useStickyState<string[]>([], 'ff_inventory');
+  const [, setInventory] = useStickyState<string[]>([], 'ff_inventory');
   const [ownedPets, setOwnedPets] = useStickyState<string[]>([], 'ff_pets');
   const [equippedPet, setEquippedPet] = useStickyState<string | null>(null, 'ff_equipped_pet');
   
@@ -357,11 +359,10 @@ export default function App() {
   const [monstersKilled, setMonstersKilled] = useStickyState(0, 'ff_kills');
   const [lastLoginDate, setLastLoginDate] = useStickyState('', 'ff_login');
   const [streakDays, setStreakDays] = useStickyState(0, 'ff_streak');
-  const [claimedAch, setClaimedAch] = useStickyState<string[]>([], 'ff_ach');
   const [bestiary, setBestiary] = useStickyState<string[]>([], 'ff_bestiary');
   
   const [sfxEnabled, setSfxEnabled] = useStickyState(true, 'ff_sfx');
-  const [ambianceEnabled, setAmbianceEnabled] = useStickyState(false, 'ff_ambiance');
+  const [ambianceEnabled] = useStickyState(false, 'ff_ambiance');
   const [ambianceVolume, setAmbianceVolume] = useStickyState(0.5, 'ff_ambiance_volume');
 
   type TabType = 'play' | 'shop' | 'profile' | 'zones' | 'bestiary'; 
@@ -385,24 +386,17 @@ export default function App() {
   const [combo, setCombo] = useState(0);
   const [comboTimer, setComboTimer] = useState(0);
 
-  const [freezeTimeLeft, setFreezeTimeLeft] = useState(0);
-  const [isFrozen, setIsFrozen] = useState(false);
-
   // MONSTRES UNIQUES
   const [sessionMonsterQueue, setSessionMonsterQueue] = useState<string[]>([]);
   const [currentMonsterId, setCurrentMonsterId] = useState<string>('slime');
   
   const [monsterCurrentHp, setMonsterCurrentHp] = useState(100);
-  const [isAttacking, setIsAttacking] = useState(false);
   const [isHit, setIsHit] = useState(false);
   const [lastDamage, setLastDamage] = useState(0);
   const [isCrit, setIsCrit] = useState(false);
   const [shinyType, setShinyType] = useState<'none' | 'gold' | 'xp' | 'boss'>('none');
   
-  const [particles, setParticles] = useState<{id: number, x: number, y: number}[]>([]);
-
   const timerRef = useRef<number | null>(null);
-  const freezeIntervalRef = useRef<number | null>(null);
   const comboIntervalRef = useRef<number | null>(null);
   
   const weapon = WEAPONS[currentWeapon];
@@ -464,16 +458,6 @@ export default function App() {
   }, [gameState, ambianceEnabled, currentAmbiance]); 
 
   const triggerSfx = (type: string) => { if (sfxEnabled) playSfx(type); };
-
-  const spawnParticles = (count: number) => {
-    const newParticles = Array.from({length: count}).map((_, i) => ({
-      id: Date.now() + i,
-      x: Math.random() * 100 - 50,
-      y: Math.random() * 100 - 50
-    }));
-    setParticles(prev => [...prev, ...newParticles]);
-    setTimeout(() => { setParticles(prev => prev.filter(p => !newParticles.includes(p))); }, 500);
-  };
 
   const handleWatchAd = (rewardType: 'chest' | 'revive') => {
     if (isAdLoading) return;
@@ -573,20 +557,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (gameState === 'playing' && !isFrozen) {
+    if (gameState === 'playing') {
       comboIntervalRef.current = window.setInterval(() => {
         setComboTimer(prev => { if (prev <= 0) { setCombo(0); return 0; } return prev - 1; });
       }, 100);
     }
     return () => { if (comboIntervalRef.current) clearInterval(comboIntervalRef.current); };
-  }, [gameState, isFrozen]);
+  }, [gameState]);
 
   useEffect(() => {
-    if (gameState === 'playing' && !isFrozen) {
+    if (gameState === 'playing') {
       timerRef.current = window.setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) { endBattle(true); return 0; }
-          setIsAttacking(true); setTimeout(() => setIsAttacking(false), 150);
           setIsHit(true); setTimeout(() => setIsHit(false), 200);
           let dmg = getWeaponDamage() * multDamage;
           if (activePetObj?.type === 'damage') dmg += activePetObj.val;
@@ -596,7 +579,6 @@ export default function App() {
           if (isCritHit) dmg *= 3;
           setLastDamage(Math.floor(dmg));
           setIsCrit(isCritHit);
-          if(Math.random() > 0.7) spawnParticles(isCritHit ? 10 : 3);
           if (isCritHit) triggerSfx('crit'); else triggerSfx('attack');
           setMonsterCurrentHp((h) => {
             const newHp = h - dmg;
@@ -608,7 +590,7 @@ export default function App() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterId]);
+  }, [gameState, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterId]);
 
   const handleMonsterKill = () => {
     const killedMonster = currentMonster;
@@ -628,9 +610,7 @@ export default function App() {
 
   const endBattle = (victory: boolean) => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (freezeIntervalRef.current) clearInterval(freezeIntervalRef.current);
     if (comboIntervalRef.current) clearInterval(comboIntervalRef.current);
-    setIsFrozen(false);
     if (victory) {
       triggerSfx('win');
       const totalXpGained = sessionXpEarned + (selectedTime * 10);
@@ -797,7 +777,7 @@ export default function App() {
                                                         <div className="text-xl w-10 h-10 bg-stone-900 rounded flex items-center justify-center relative">{w.icon}{lvl > 0 && <div className="absolute -top-1 -right-1 bg-blue-600 text-white text-[9px] rounded px-1">+{lvl}</div>}</div>
                                                         <div><div className="font-bold text-sm text-stone-200">{tData(w.name)}</div><div className="text-[10px] text-stone-500">{t('damage')}: {dmg}</div></div>
                                                     </div>
-                                                    {isOwned ? (currentWeapon === idx ? <div className="w-2 h-2 bg-green-500 rounded-full"></div> : <button onClick={() => {setData(d => ({...d, currentWeapon: idx})); setCurrentWeapon(idx);}} className="text-[10px] bg-stone-700 px-2 py-1 rounded text-stone-300">{t('equipped')}</button>) : <button onClick={() => {if(gold>=w.cost){setGold(g=>g-w.cost); setCurrentWeapon(idx)}}} className="text-yellow-400 text-xs font-bold border border-yellow-500/30 px-2 py-1 rounded">{w.cost} 🪙</button>}
+                                                    {isOwned ? (currentWeapon === idx ? <div className="w-2 h-2 bg-green-500 rounded-full"></div> : <button onClick={() => setCurrentWeapon(idx)} className="text-[10px] bg-stone-700 px-2 py-1 rounded text-stone-300">{t('equipped')}</button>) : <button onClick={() => {if(gold>=w.cost){setGold(g=>g-w.cost); setCurrentWeapon(idx)}}} className="text-yellow-400 text-xs font-bold border border-yellow-500/30 px-2 py-1 rounded">{w.cost} 🪙</button>}
                                                 </div>
                                                 {isOwned && <button onClick={() => upgradeWeapon(idx)} className="flex items-center justify-center gap-2 bg-stone-900/50 hover:bg-stone-900 p-2 rounded text-[10px] text-stone-400 border border-dashed border-stone-700"><Hammer size={10} /> {t('upgrade')} (+20%) <span className="text-yellow-500 font-bold">{upgCost} 🪙</span></button>}
                                             </div>
@@ -848,7 +828,7 @@ export default function App() {
                                     <div className={`absolute inset-0 bg-gradient-to-r ${z.color} opacity-50`}></div>
                                     <div className="relative p-4 flex justify-between items-center">
                                        <div className="flex items-center gap-4"><div className="text-3xl">{z.icon}</div><div><div className="font-bold text-sm text-white uppercase">{tData(MONSTERS.find(m => m.id === z.monsters[0])?.name || {fr: 'Zone', en: 'Zone'})}</div><div className="text-[10px] text-stone-300 font-bold">Bonus: x{z.mult}</div></div></div>
-                                       {isUnlocked ? (isCurrent ? <div className="bg-indigo-500 text-white text-[10px] px-2 py-1 rounded font-bold">ACTUEL</div> : <div className="text-xs text-stone-400 flex items-center">{t('travel')} <ArrowRight size={12} className="ml-1"/></div>) : <div className="bg-stone-900/80 hover:bg-black text-yellow-400 text-xs px-3 py-2 rounded border border-yellow-500/30 flex items-center gap-2 font-bold"><Lock size={12}/> {z.cost}</div>}
+                                       {isUnlocked ? (isCurrent ? <div className="bg-indigo-500 text-white text-[10px] px-2 py-1 rounded font-bold">ACTUEL</div> : <div className="text-xs text-stone-400 flex items-center">{t('travel')} <ArrowRight size={12} className="ml-1"/></div>) : <button onClick={(e) => { e.stopPropagation(); unlockZone(z.id, z.cost); }} className="bg-stone-900/80 hover:bg-black text-yellow-400 text-xs px-3 py-2 rounded border border-yellow-500/30 flex items-center gap-2 font-bold"><Lock size={12}/> {z.cost}</button>}
                                     </div>
                                  </div>
                               )
@@ -861,9 +841,9 @@ export default function App() {
                           <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold flex items-center"><Pickaxe size={14} className="mr-2"/> {t('talents')}</h3><span className="text-xs text-stone-400">{t('points')}: <span className="text-white font-bold">{availableTalents}</span></span></div>
                              <div className="space-y-2">
-                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><Sword size={14} className="text-red-400"/><span className="text-xs">{t('str')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.str}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, str:t.str+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
-                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><ShoppingBag size={14} className="text-yellow-400"/><span className="text-xs">{t('greed')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.greed}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, greed:t.greed+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
-                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><BookOpen size={14} className="text-blue-400"/><span className="text-xs">{t('wis')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.wis}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, wis:t.wis+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
+                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><Sword size={14} className="text-red-400"/><span className="text-xs">{t('str')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.str}</span><button disabled={availableTalents===0} onClick={()=>updateTalent('str')} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
+                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><ShoppingBag size={14} className="text-yellow-400"/><span className="text-xs">{t('greed')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.greed}</span><button disabled={availableTalents===0} onClick={()=>updateTalent('greed')} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
+                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><BookOpen size={14} className="text-blue-400"/><span className="text-xs">{t('wis')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.wis}</span><button disabled={availableTalents===0} onClick={()=>updateTalent('wis')} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
                              </div>
                           </div>
                           <div className="flex justify-around bg-stone-800 p-3 rounded-xl border border-stone-700 mb-2">
@@ -981,7 +961,7 @@ export default function App() {
                  <><Trophy size={80} className="text-yellow-400 mb-6 animate-bounce" /><h2 className="text-4xl font-black uppercase text-green-400 mb-2">{t('victory')}</h2></>
               ) : (
                  <><Skull size={80} className="text-red-500 mb-6 animate-pulse" /><h2 className="text-4xl font-black uppercase text-red-500 mb-2">{t('defeat')}</h2><p className="text-stone-300 mb-8">{tData(currentMonster.lore)}</p>
-                 <div className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</div>
+                 <button onClick={() => handleWatchAd('revive')} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</button>
                  </>
               )}
               
@@ -1023,5 +1003,6 @@ export default function App() {
         {/* Note: Ce composant doit être au-dessus de la nav bar si présente */}
         {gameState === 'menu' ? null : <SafeAdBanner />} 
       </div>
+    </div>
   );
 }

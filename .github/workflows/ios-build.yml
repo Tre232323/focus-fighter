@@ -35,7 +35,7 @@ jobs:
           rm capacitor.config.ts || true
           rm capacitor.config.json || true
           
-          # Initialisation (CHANGEMENT ICI)
+          # Initialisation
           npx cap init "Focus Fighter RPG" "com.tonnom.focusfighter" --web-dir dist
           
           # Ajout de la plateforme iOS
@@ -86,6 +86,11 @@ jobs:
         run: |
           cd ios/App
           
+          # --- FIX VERSION : Incrémentation automatique ---
+          # On force la version à utiliser le numéro unique de build GitHub
+          echo "Mise à jour de la version de build vers ${{ github.run_number }}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" App/Info.plist
+
           # --- FIX EXPORT PLIST : Génération via PlistBuddy (Plus robuste) ---
           # On crée le fichier proprement au lieu de l'écrire en texte
           /usr/libexec/PlistBuddy -c "Add :method string app-store" exportOptions.plist
@@ -122,9 +127,4 @@ jobs:
       # Envoi Automatique vers l'App Store Connect
       - name: Upload to App Store Connect (via altool)
         run: |
-          # --- AVERTISSEMENT CRITIQUE ---
-          # Si cette étape échoue avec "Failed to get authorization":
-          # 1. Vérifiez que APPLE_ID est votre adresse email Apple Developer.
-          # 2. Vérifiez que APPLE_APP_SPECIFIC_PASSWORD est le mot de passe généré
-          #    sur appleid.apple.com (il n'est PAS votre mot de passe principal).
           xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "${{ secrets.APPLE_ID }}" -p "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"

@@ -3,10 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- VUE MOBILE OBLIGATOIRE -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>focus-fighter</title>
+    <title>Focus Fighter RPG</title>
+
+    <!-- Intégration du script Google Tag Manager (GTM) dans <head> -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-TXBP7G94');</script>
+    <!-- Fin GTM -->
   </head>
   <body>
+    <!-- Intégration de la balise non-script de GTM (juste après <body>) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TXBP7G94"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- Fin GTM (noscript) -->
+    
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

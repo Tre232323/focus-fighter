@@ -3,11 +3,21 @@ import {
   Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, 
   Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, 
   Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, 
-  Battery, EyeOff, X, Info, Heart
+  Battery, EyeOff, X
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+
+// --- TS VALIDATION & GLOBALS ---
+// These declarations satisfy the compiler for the environment-specific variables
+declare const __firebase_config: string | undefined;
+declare const __app_id: string | undefined;
+declare const __initial_auth_token: string | undefined;
+
+interface Window {
+  webkitAudioContext: typeof AudioContext;
+}
 
 // --- CONFIGURATION & CONSTANTES ---
 const REWARD_DAILY = 50;
@@ -23,20 +33,21 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- AUDIO ENGINE ---
-let audioCtx = null;
-let ambianceNode = null;
-let ambianceGain = null;
-let lfoNode = null;
+let audioCtx: AudioContext | null = null;
+let ambianceNode: AudioBufferSourceNode | null = null;
+let ambianceGain: GainNode | null = null;
+let lfoNode: OscillatorNode | null = null;
 
 const initAudio = () => {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    audioCtx = new AudioContextClass();
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 };
 
-const startProceduralAmbiance = (ctx, type, volume) => {
+const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number) => {
   if (ambianceNode) { try { ambianceNode.stop(); } catch(e) {} }
   if (lfoNode) { try { lfoNode.stop(); } catch(e) {} }
 
@@ -76,7 +87,7 @@ const startProceduralAmbiance = (ctx, type, volume) => {
   ambianceNode.start(0);
 };
 
-const toggleAmbiance = (enable, type, volume) => {
+const toggleAmbiance = (enable: boolean, type: string, volume: number) => {
   const ctx = initAudio();
   if (!enable || type === 'silence') {
     if (ambianceNode) { try { ambianceNode.stop(); } catch(e) {} ambianceNode = null; }
@@ -198,7 +209,13 @@ const AMBIANCES = [
   { id: 'space', icon: "🌌", name: { fr: "Espace", en: "Space" }, bg: "bg-indigo-950" },
 ];
 
-const MonsterAvatar = ({ id, color, isBoss, isHit }) => {
+interface MonsterAvatarProps {
+  color: string;
+  isBoss: boolean;
+  isHit: boolean;
+}
+
+const MonsterAvatar = ({ color, isBoss, isHit }: MonsterAvatarProps) => {
   return (
     <div className={`w-32 h-32 flex items-center justify-center transition-all ${isBoss ? 'scale-110 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]' : ''} ${isHit ? 'animate-shake brightness-150' : ''}`}>
       <svg viewBox="0 0 100 100" className={`w-full h-full ${color}`}>
@@ -221,32 +238,31 @@ const SafeAdBanner = () => (
 
 // --- COMPOSANT PRINCIPAL ---
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [lang, setLang] = useState('fr');
+  const [user, setUser] = useState<any>(null);
+  const [lang, setLang] = useState<'fr' | 'en'>('fr');
   
   // States persistent
   const [gold, setGold] = useState(0);
   const [playerXp, setPlayerXp] = useState(0);
   const [playerLevel, setPlayerLevel] = useState(1);
   const [currentWeapon, setCurrentWeapon] = useState(0);
-  const [weaponLevels, setWeaponLevels] = useState({});
-  const [inventory, setInventory] = useState([]);
-  const [ownedPets, setOwnedPets] = useState([]);
-  const [equippedPet, setEquippedPet] = useState(null);
+  const [weaponLevels, setWeaponLevels] = useState<Record<number, number>>({});
+  const [inventory, setInventory] = useState<string[]>([]);
+  const [ownedPets, setOwnedPets] = useState<string[]>([]);
+  const [equippedPet, setEquippedPet] = useState<string | null>(null);
   const [talents, setTalents] = useState({ str: 0, greed: 0, wis: 0 });
-  const [unlockedZones, setUnlockedZones] = useState(['forest']);
+  const [unlockedZones, setUnlockedZones] = useState<string[]>(['forest']);
   const [currentZone, setCurrentZone] = useState('forest');
-  const [bestiary, setBestiary] = useState([]);
+  const [bestiary, setBestiary] = useState<string[]>([]);
   const [monstersKilled, setMonstersKilled] = useState(0);
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
 
   // States UI
-  const [gameState, setGameState] = useState('menu');
-  const [activeTab, setActiveTab] = useState('play');
-  const [shopTab, setShopTab] = useState('weapons');
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'defeat'>('menu');
+  const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones' | 'bestiary'>('play');
+  const [shopTab, setShopTab] = useState<'weapons' | 'potions' | 'pets'>('weapons');
   const [showSettings, setShowSettings] = useState(false);
-  const [showDailyReward, setShowDailyReward] = useState(false);
   const [batteryMode, setBatteryMode] = useState(false);
   const [ambianceVolume, setAmbianceVolume] = useState(0.5);
   const [currentAmbiance, setCurrentAmbiance] = useState(0);
@@ -264,11 +280,11 @@ export default function App() {
   const [isHit, setIsHit] = useState(false);
   const [lastDamage, setLastDamage] = useState(0);
   const [isCrit, setIsCrit] = useState(false);
-  const [shinyType, setShinyType] = useState('none');
-  const [activeBuff, setActiveBuff] = useState(null);
+  const [shinyType, setShinyType] = useState<'none' | 'boss' | 'gold'>('none');
+  const [activeBuff, setActiveBuff] = useState<string | null>(null);
   const [isAttacking, setIsAttacking] = useState(false);
 
-  const timerRef = useRef(null);
+  const timerRef = useRef<any>(null);
 
   // --- FIREBASE SYNC ---
   useEffect(() => {
@@ -310,11 +326,15 @@ export default function App() {
   };
 
   // --- LOGIQUE DE JEU ---
-  const t = (k) => TEXTS[lang][k] || k;
-  const tData = (d) => d[lang] || d['en'];
+  const t = (k: string) => {
+    const langObj = TEXTS[lang] as any;
+    return langObj[k] || k;
+  };
+  const tData = (d: any) => d[lang] || d['en'];
 
   const spawnMonster = (isFirst = false) => {
     const zone = ZONES.find(z => z.id === currentZone);
+    if (!zone) return;
     const mPool = zone.monsters;
     const isBoss = !isFirst && (sessionKills + 1) % 10 === 0;
     
@@ -328,7 +348,7 @@ export default function App() {
     setMonsterCurrentHp(hp);
   };
 
-  const handleWatchAd = (rewardType) => {
+  const handleWatchAd = (rewardType: 'chest' | 'revive') => {
     if (isAdLoading) return;
     setIsAdLoading(true);
     setTimeout(() => {
@@ -342,7 +362,7 @@ export default function App() {
     }, 2000);
   };
 
-  const startBattle = (mins) => {
+  const startBattle = (mins: number) => {
     initAudio();
     setSelectedTime(mins);
     setTimeLeft(mins * 60);
@@ -351,7 +371,7 @@ export default function App() {
     spawnMonster(true);
   };
 
-  const endBattle = (victory) => {
+  const endBattle = (victory: boolean) => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (victory) {
       setGold(g => g + sessionGold);
@@ -376,7 +396,6 @@ export default function App() {
         setTimeLeft(prev => {
           if (prev <= 1) { endBattle(true); return 0; }
           
-          // Déclencher animation attaque
           setIsAttacking(true);
           setTimeout(() => setIsAttacking(false), 300);
 
@@ -397,6 +416,7 @@ export default function App() {
           setMonsterCurrentHp(h => {
             if (h - dmg <= 0) {
               const m = MONSTERS.find(mo => mo.id === currentMonsterId);
+              if (!m) return 0;
               let gMult = (1 + talents.greed * 0.05) * (1 + combo * 0.1);
               if (activeBuff === 'potion_gold') gMult *= 2;
               if (pet && pet.type === 'gold') gMult *= (1 + pet.val);
@@ -413,7 +433,7 @@ export default function App() {
               setSessionXp(sx => sx + xWon);
               setSessionKills(sk => sk + 1);
               setCombo(c => Math.min(c + 1, 10));
-              if (!bestiary.includes(currentMonsterId)) setBestiary(b => [...b, currentMonsterId]);
+              setBestiary(b => b.includes(currentMonsterId) ? b : [...b, currentMonsterId]);
               
               spawnMonster();
               return 999999;
@@ -424,8 +444,8 @@ export default function App() {
         });
       }, 1000);
     }
-    return () => clearInterval(timerRef.current);
-  }, [gameState, currentMonsterId, combo, equippedPet, activeBuff, currentWeapon, weaponLevels, talents.str]);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [gameState, currentMonsterId, combo, equippedPet, activeBuff, currentWeapon, weaponLevels, talents]);
 
   useEffect(() => {
     if (gameState === 'playing') {
@@ -433,9 +453,10 @@ export default function App() {
     } else {
       toggleAmbiance(false, 'silence', 0);
     }
-  }, [gameState, currentAmbiance]);
+  }, [gameState, currentAmbiance, ambianceVolume]);
 
   const availableTalents = Math.max(0, (playerLevel - 1) - (talents.str + talents.greed + talents.wis));
+  const currentZoneObj = ZONES.find(z => z.id === currentZone) || ZONES[0];
 
   return (
     <div className={`fixed inset-0 flex items-center justify-center bg-stone-950 text-white font-mono select-none overflow-hidden ${AMBIANCES[currentAmbiance].bg}`}>
@@ -508,9 +529,9 @@ export default function App() {
 
               {activeTab === 'play' && (
                 <div className="animate-in fade-in duration-500">
-                  <div className={`w-full h-48 rounded-2xl bg-gradient-to-br ${ZONES.find(z => z.id === currentZone).color} border-4 border-stone-800 flex flex-col items-center justify-center relative mb-6 shadow-inner`}>
-                    <div className="text-7xl mb-2 drop-shadow-xl">{ZONES.find(z => z.id === currentZone).icon}</div>
-                    <div className="font-black text-2xl uppercase tracking-widest text-white drop-shadow-md">{t(ZONES.find(z => z.id === currentZone).name)}</div>
+                  <div className={`w-full h-48 rounded-2xl bg-gradient-to-br ${currentZoneObj.color} border-4 border-stone-800 flex flex-col items-center justify-center relative mb-6 shadow-inner`}>
+                    <div className="text-7xl mb-2 drop-shadow-xl">{currentZoneObj.icon}</div>
+                    <div className="font-black text-2xl uppercase tracking-widest text-white drop-shadow-md">{t(currentZoneObj.name)}</div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 mb-6">
@@ -536,7 +557,7 @@ export default function App() {
                 <div className="space-y-4 animate-in fade-in duration-300">
                    <div className="flex bg-stone-900 p-1 rounded-xl border border-stone-800">
                      {['weapons', 'potions', 'pets'].map(tab => (
-                       <button key={tab} onClick={() => setShopTab(tab)} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg ${shopTab === tab ? 'bg-stone-700 text-white' : 'text-stone-500'}`}>{t(tab)}</button>
+                       <button key={tab} onClick={() => setShopTab(tab as any)} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg ${shopTab === tab ? 'bg-stone-700 text-white' : 'text-stone-500'}`}>{t(tab)}</button>
                      ))}
                    </div>
 
@@ -612,7 +633,7 @@ export default function App() {
                      return (
                        <div key={m.id} className={`bg-stone-800/50 p-4 rounded-2xl border ${unlocked ? 'border-stone-700' : 'border-stone-800 opacity-40'} flex flex-col items-center text-center`}>
                           <div className={`w-16 h-16 rounded-full bg-black/30 flex items-center justify-center mb-3 ${!unlocked ? 'grayscale' : ''}`}>
-                            {unlocked ? <MonsterAvatar id={m.id} color={m.color} isBoss={false} /> : <Skull size={24} className="text-stone-700" />}
+                            {unlocked ? <MonsterAvatar color={m.color} isBoss={false} isHit={false} /> : <Skull size={24} className="text-stone-700" />}
                           </div>
                           <div className="text-[11px] font-black uppercase text-stone-200">{unlocked ? tData(m.name) : t('unknown')}</div>
                           {unlocked && <div className="text-[8px] italic text-stone-500 mt-1 line-clamp-2">"{tData(m.lore)}"</div>}
@@ -627,7 +648,7 @@ export default function App() {
                   <div className="bg-stone-800/50 p-6 rounded-2xl border border-stone-800">
                     <div className="flex justify-between items-center mb-6"><h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Pickaxe size={16} className="text-stone-500"/> {t('talents')}</h3><span className="text-xs font-bold text-stone-500">{t('points')}: <span className="text-white">{availableTalents}</span></span></div>
                     <div className="space-y-3">
-                      {['str', 'greed', 'wis'].map(key => (
+                      {(['str', 'greed', 'wis'] as const).map(key => (
                         <div key={key} className="bg-stone-900/50 p-3.5 rounded-xl flex justify-between items-center border border-stone-800/50">
                           <span className="text-xs font-bold uppercase text-stone-400">{t(key)} (+{talents[key]*5}%)</span>
                           <div className="flex items-center gap-4"><span className="font-black text-sm">{talents[key]}</span><button disabled={availableTalents <= 0} onClick={() => setTalents({...talents, [key]: talents[key] + 1})} className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-900/20">+</button></div>
@@ -649,6 +670,7 @@ export default function App() {
                       <div className="flex flex-wrap gap-2">
                         {inventory.map((id, idx) => {
                           const item = ITEMS.find(it => it.id === id);
+                          if (!item) return null;
                           return (
                             <button key={idx} onClick={() => { setActiveBuff(id); setInventory(inventory.filter((_, i) => i !== idx)); }} className="bg-stone-900 px-3 py-2 rounded-lg border border-stone-700 text-xs flex items-center gap-2 group hover:bg-stone-800 transition-all">
                               <span>{item.icon}</span> <span className="text-[10px] font-black uppercase">{tData(item.name)}</span>
@@ -688,7 +710,6 @@ export default function App() {
 
                 <div className="relative mb-12 flex flex-col items-center">
                   <MonsterAvatar 
-                    id={currentMonsterId} 
                     color={(MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0]).color} 
                     isBoss={shinyType === 'boss'} 
                     isHit={isHit}
@@ -721,7 +742,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ARME AVEC ANIMATION DE FRAPPE */}
                 <div className={`mt-16 text-7xl transition-all duration-100 ${isAttacking ? 'animate-strike' : 'opacity-20'}`}>
                   {WEAPONS[currentWeapon].icon}
                 </div>

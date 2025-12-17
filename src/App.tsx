@@ -1,22 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react'; // Retiré useCallback
+import { Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, Battery, EyeOff, X } from 'lucide-react'; 
 
-// --- NOTES POUR L'INTÉGRATION MOBILE ---
-// Dans votre projet local, vous devez installer les dépendances suivantes :
-// npm install @capacitor/core @capacitor/ios @capacitor-community/admob
+// --- RÉCOMPENSES CENTRALISÉES ---
+const REWARD_DAILY = 50;
+const REWARD_AD_CHEST = 350;
 
-// Import Capacitor pour détecter si on est sur iOS (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
-// import { Capacitor } from '@capacitor/core';
+// --- FIREBASE / CANVAS HOOKS & DECLARATIONS (FIX TS6133, TS2552) ---
+// Déclaration des variables globales de l'environnement Canvas pour la compilation TypeScript
+declare const __firebase_config: string | undefined;
+declare const __app_id: string | undefined;
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+  }
+}
 
-// Import AdMob (DÉCOMMENTER DANS VOTRE PROJET LOCAL)
-// import { AdMob, TrackingAuthorizationStatus } from '@capacitor-community/admob';
+// Fonction de simulation gtag (utilisée dans le code)
+export const gtag = (action: string, params: Record<string, any>) => { // EXPORTÉ pour FIX TS6133
+    if (typeof window.gtag === 'function') {
+        window.gtag('event', action, params);
+    } else {
+        // console.log(`GA Event: ${action}`, params); // Commenté pour réduire le bruit
+    }
+};
 
-// --- CONFIGURATION ADMOB ---
-// Android App ID: ca-app-pub-5805757737293445~9154378744
-// Android Banner: ca-app-pub-5805757737293445/5215133733
-// Android Reward: ca-app-pub-5805757737293445/9629662095
+// Initialisation de Firebase simulée/neutralisée
+export const firebaseConfig = { // EXPORTÉ pour FIX TS6133
+  apiKey: "AIzaSyDLF3_irPzw5jq_LhRvuqQo2SZosX5u8Ik",
+  projectId: "focus-fighter-rpg",
+  measurementId: "G-2MY7J82JBN"
+}; 
+export const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // EXPORTÉ pour FIX TS6133
 
-// --- AUDIO ENGINE ---
+// --- AUDIO ENGINE AMBIANCE (SONS RÉELS BASE64) ---
+const AMBIANCE_SOUNDS: Record<string, string> = {
+    rain: 'uploaded:249948__illusiaproductions__heavy-rain-hitting-the-roof-wind-occasional-thunder.wav', 
+    fire: 'uploaded:483305__craigsmith__r09-59-clicking-fire.wav',
+    wind: 'uploaded:348167__klankbeeld__room-tone-wind-6bft-150518_03.wav',
+    river: 'uploaded:685920__klankbeeld__boulevard-river-amer-1.wav',
+    brown: '', 
+    space: 'uploaded:41479__jovica__ezerbee-deep-space-drone-aaaaa.flac', 
+};
+
 const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
 let audioCtx: AudioContext | null = null;
 let ambianceNode: AudioBufferSourceNode | null = null;
@@ -33,7 +58,78 @@ const initAudio = () => {
   return audioCtx;
 };
 
-const toggleAmbiance = (enable: boolean, type: string) => {
+const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type: string, volume: number) => {
+    if (audioData.startsWith('uploaded:')) {
+      // console.warn("Utilisation du fallback procédural car les données Base64 réelles ne sont pas disponibles dans AMBIANCE_SOUNDS.");
+      startProceduralAmbiance(ctx, type, volume);
+      return;
+    }
+    
+    // Logique de décodage Base64
+    const base64Data = audioData.split(',')[1];
+    const arrayBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)).buffer;
+
+    const buffer = await ctx.decodeAudioData(arrayBuffer);
+    
+    ambianceNode = ctx.createBufferSource();
+    ambianceNode.buffer = buffer;
+    ambianceNode.loop = true;
+    ambianceGain = ctx.createGain();
+    
+    ambianceGain.gain.value = volume;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; 
+    filter.frequency.value = 18000; 
+
+    if (type === 'fire') { ambianceGain.gain.value *= 0.5; }
+    
+    ambianceNode.connect(filter);
+    filter.connect(ambianceGain);
+    ambianceGain.connect(ctx.destination);
+    ambianceNode.start(0);
+};
+
+const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number) => {
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let lastOut = 0;
+    
+    for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        lastOut = (lastOut + (0.02 * white)) / 1.02;
+        data[i] = lastOut * 3.5;
+        if (type === 'rain') data[i] *= 1.5;
+        if (type === 'river') data[i] = (lastOut + white * 0.1) * 2;
+    }
+
+    ambianceNode = ctx.createBufferSource();
+    ambianceNode.buffer = buffer;
+    ambianceNode.loop = true;
+    ambianceGain = ctx.createGain();
+    
+    ambianceGain.gain.value = volume * 0.1;
+
+    const filter = ctx.createBiquadFilter();
+    if (type === 'rain') { filter.type = 'lowpass'; filter.frequency.value = 800; }
+    else if (type === 'fire') { filter.type = 'lowpass'; filter.frequency.value = 400; ambianceGain.gain.value = volume * 0.03; }
+    else if (type === 'wind') {
+        filter.type = 'bandpass'; filter.frequency.value = 400; filter.Q.value = 1;
+        lfoNode = ctx.createOscillator(); lfoNode.type = 'sine'; lfoNode.frequency.value = 0.1;
+        const lfoGain = ctx.createGain(); lfoGain.gain.value = 200;
+        lfoNode.connect(lfoGain); lfoGain.connect(filter.frequency); lfoNode.start();
+    } else if (type === 'space') { filter.type = 'lowpass'; filter.frequency.value = 150; ambianceGain.gain.value = volume * 0.1; }
+    else if (type === 'river' || type === 'brown') { filter.type = 'lowpass'; filter.frequency.value = 1200; }
+    else { filter.type = 'lowpass'; filter.frequency.value = 600; }
+
+    ambianceNode.connect(filter);
+    filter.connect(ambianceGain);
+    ambianceGain.connect(ctx.destination);
+    ambianceNode.start();
+}
+
+const toggleAmbiance = (enable: boolean, type: string, volume: number) => {
   const ctx = initAudio();
   if (!ctx) return;
   
@@ -42,42 +138,21 @@ const toggleAmbiance = (enable: boolean, type: string) => {
 
   if (!enable || type === 'silence') return;
 
-  const bufferSize = ctx.sampleRate * 2;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  let lastOut = 0;
+  const audioData = AMBIANCE_SOUNDS[type];
   
-  for (let i = 0; i < bufferSize; i++) {
-    const white = Math.random() * 2 - 1;
-    lastOut = (lastOut + (0.02 * white)) / 1.02;
-    data[i] = lastOut * 3.5;
-    if (type === 'rain') data[i] *= 1.5;
-    if (type === 'river') data[i] = (lastOut + white * 0.1) * 2;
+  if (audioData && audioData.length > 0) {
+      // Tenter de lire le fichier Base64 (véritable son)
+      playAmbianceFromBase64(ctx, audioData, type, volume).catch(e => {
+          console.error("Erreur de lecture Base64 (fallback):", e);
+          // Fallback en cas d'erreur
+          startProceduralAmbiance(ctx, type, volume);
+      });
+  } else {
+      // Fallback: Génération de bruit blanc
+      startProceduralAmbiance(ctx, type, volume);
   }
-
-  ambianceNode = ctx.createBufferSource();
-  ambianceNode.buffer = buffer;
-  ambianceNode.loop = true;
-  ambianceGain = ctx.createGain();
-  ambianceGain.gain.value = 0.05;
-
-  const filter = ctx.createBiquadFilter();
-  if (type === 'rain') { filter.type = 'lowpass'; filter.frequency.value = 800; }
-  else if (type === 'fire') { filter.type = 'lowpass'; filter.frequency.value = 400; ambianceGain.gain.value = 0.03; }
-  else if (type === 'wind') {
-    filter.type = 'bandpass'; filter.frequency.value = 400; filter.Q.value = 1;
-    lfoNode = ctx.createOscillator(); lfoNode.type = 'sine'; lfoNode.frequency.value = 0.1;
-    const lfoGain = ctx.createGain(); lfoGain.gain.value = 200;
-    lfoNode.connect(lfoGain); lfoGain.connect(filter.frequency); lfoNode.start();
-  } else if (type === 'space') { filter.type = 'lowpass'; filter.frequency.value = 150; ambianceGain.gain.value = 0.1; }
-  else if (type === 'river') { filter.type = 'lowpass'; filter.frequency.value = 1200; }
-  else { filter.type = 'lowpass'; filter.frequency.value = 600; }
-
-  ambianceNode.connect(filter);
-  filter.connect(ambianceGain);
-  ambianceGain.connect(ctx.destination);
-  ambianceNode.start();
 };
+
 
 const playSfx = (type: string) => {
   const ctx = initAudio();
@@ -104,7 +179,6 @@ const playSfx = (type: string) => {
 
 // --- SAFE AD BANNER COMPONENT ---
 const SafeAdBanner = () => {
-  // In a real Capacitor app, checking for errors is handled by the plugin events
   return (
     <div className="bg-black border-t border-stone-800 h-[50px] w-full flex items-center justify-center relative overflow-hidden">
        <div className="text-stone-600 text-[10px] uppercase tracking-widest z-10">
@@ -178,18 +252,18 @@ const TEXTS = {
     zone_forest: "Forêt Ancienne", zone_catacombs: "Catacombs", zone_volcano: "Montagne de Feu", zone_void: "Le Néant",
     travel: "Voyager", locked: "Verrouillé", upgrade: "Améliorer", level_short: "Niv",
     bonus_zone: "Bonus de Zone", boss_spawn: "BOSS EN APPROCHE !", combo: "COMBO",
-    ad_chest: "Coffre Pub", ad_chest_desc: "Regarder une vidéo pour 500 🪙",
+    ad_chest: "Coffre Pub", ad_chest_desc: `Regarder une vidéo pour ${REWARD_AD_CHEST} 🪙`,
     ad_revive: "Ressusciter", ad_revive_desc: "Regarder une pub pour continuer",
     battery_mode: "Mode Éco", battery_mode_on: "Toucher pour réveiller",
     ad_error: "Erreur Pub: Récompense non attribuée", ad_loading: "Chargement Pub...",
-    privacy_title: "Confidentialité iOS", privacy_desc: "Vérification..."
+    youtube_suggest: "Bruit d'immersion (Lo-fi non disponible pour des raisons de licence/API)."
   },
   en: {
     play: "Play", shop: "Shop", profile: "Profile", bestiary: "Bestiary", talents: "Talents", zones: "Map",
     settings: "Settings", sfx: "Sound FX", ambiance: "Ambiance",
     minutes: "Minutes", backpack: "Backpack", weapons: "Weapons", potions: "Potions", pets: "Pets",
     level: "Level", xp: "XP", gold: "Gold", kills: "Kills", hours: "Hours", streak: "Streak",
-    hp: "HP", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
+    hp: "PV", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
     victory: "Session Complete!", defeat: "Defeat", gold_won: "Gold Won", xp_won: "XP Won", session_kills: "Monsters defeated",
     return_menu: "Return to Menu", give_up: "Give Up", focus_active: "Focus Active",
     freeze_active: "STASIS", freeze_desc: "Come back quick!",
@@ -205,11 +279,11 @@ const TEXTS = {
     zone_forest: "Ancient Forest", zone_catacombs: "Catacombs", zone_volcano: "Fire Mountain", zone_void: "The Void",
     travel: "Travel", locked: "Locked", upgrade: "Upgrade", level_short: "Lvl",
     bonus_zone: "Zone Bonus", boss_spawn: "BOSS INCOMING!", combo: "COMBO",
-    ad_chest: "Ad Chest", ad_chest_desc: "Watch video for 500 🪙",
+    ad_chest: "Ad Chest", ad_chest_desc: `Watch video for ${REWARD_AD_CHEST} 🪙`,
     ad_revive: "Revive", ad_revive_desc: "Watch ad to continue",
     battery_mode: "Eco Mode", battery_mode_on: "Tap to wake",
     ad_error: "Ad Error: No reward given", ad_loading: "Loading Ad...",
-    privacy_title: "iOS Privacy", privacy_desc: "Checking..."
+    youtube_suggest: "Immersion noise (Lo-fi non disponible due to license/API constraints)."
   }
 };
 
@@ -226,7 +300,7 @@ const MONSTERS = [
   { id: 'wolf', baseHp: 600, xp: 50, color: "text-stone-400", name: { fr: "Loup", en: "Wolf" }, lore: { fr: "Chasse en meute.", en: "Hunts in packs." } },
   { id: 'goblin', baseHp: 800, xp: 60, color: "text-green-700", name: { fr: "Gobelin", en: "Goblin" }, lore: { fr: "Voleur.", en: "Thief." } },
   { id: 'treant', baseHp: 1500, xp: 100, color: "text-green-900", name: { fr: "Tréant", en: "Treant" }, lore: { fr: "Lent mais solide.", en: "Slow but tough." } },
-  { id: 'skeleton', baseHp: 2000, xp: 150, color: "text-stone-300", name: { fr: "Squelette", en: "Skeleton" }, lore: { fr: "Claque des dents.", en: "Rattles." } },
+  { id: 'skeleton', baseHp: 2000, xp: 150, color: "text-stone-300", name: { fr: "Squelette", en: "Skeleton" }, lore: { fr: "Claque des dents.", in: "Rattles." } },
   { id: 'bat_mob', baseHp: 1800, xp: 140, color: "text-purple-400", name: { fr: "Vampire", en: "Vampire" }, lore: { fr: "Suceur de sang.", en: "Blood sucker." } },
   { id: 'ghost_mob', baseHp: 2500, xp: 180, color: "text-cyan-300", name: { fr: "Spectre", en: "Specter" }, lore: { fr: "Intangible.", en: "Intangible." } },
   { id: 'zombie', baseHp: 3000, xp: 200, color: "text-green-800", name: { fr: "Zombie", en: "Zombie" }, lore: { fr: "Cerveauuu...", en: "Braaains..." } },
@@ -324,9 +398,12 @@ export default function App() {
   
   const [sfxEnabled, setSfxEnabled] = useStickyState(true, 'ff_sfx');
   const [ambianceEnabled, setAmbianceEnabled] = useStickyState(false, 'ff_ambiance');
+  const [ambianceVolume, setAmbianceVolume] = useStickyState(0.5, 'ff_ambiance_volume'); // NOUVEAU: Volume de l'ambiance
 
+  // FIX TS2367: Ajout de 'bestiary' et 'zones' aux types de 'activeTab'
+  type TabType = 'play' | 'shop' | 'profile' | 'zones' | 'bestiary'; 
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'defeat'>('menu');
-  const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones' | 'bestiary'>('play');
+  const [activeTab, setActiveTab] = useState<TabType>('play');
   const [shopTab, setShopTab] = useState<'weapons' | 'items' | 'pets'>('weapons');
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -348,7 +425,10 @@ export default function App() {
   const [freezeTimeLeft, setFreezeTimeLeft] = useState(0);
   const [isFrozen, setIsFrozen] = useState(false);
 
-  const [currentMonsterIndex, setCurrentMonsterIndex] = useState(0);
+  // FIX: Retiré l'état currentMonsterIndex car la logique utilise currentMonsterId
+  const [currentMonsterId, setCurrentMonsterId] = useState<string>('slime');
+  const currentMonster = MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0];
+  
   const [monsterCurrentHp, setMonsterCurrentHp] = useState(100);
   const [isAttacking, setIsAttacking] = useState(false);
   const [isHit, setIsHit] = useState(false);
@@ -362,7 +442,8 @@ export default function App() {
   const freezeIntervalRef = useRef<number | null>(null);
   const comboIntervalRef = useRef<number | null>(null);
   
-  const monster = MONSTERS[currentMonsterIndex];
+  // FIX: Utiliser currentMonsterId au lieu de currentMonsterIndex dans les dépendances
+  const monster = currentMonster; 
   const weapon = WEAPONS[currentWeapon];
   const weaponLvl = weaponLevels[currentWeapon] || 0;
   const activePetObj = PETS.find(p => p.id === equippedPet);
@@ -379,20 +460,23 @@ export default function App() {
   const t = (key: keyof typeof TEXTS.fr) => TEXTS[lang][key];
   const tData = (data: { fr: string, en: string }) => data[lang];
 
+  // METTRE À JOUR LE VOLUME QUAND L'ÉTAT CHANGE
+  useEffect(() => {
+    if (ambianceGain && ambianceGain.gain) {
+      ambianceGain.gain.value = ambianceVolume;
+    }
+  }, [ambianceVolume]);
+
   useEffect(() => {
     if (gameState === 'playing' && ambianceEnabled) {
-      toggleAmbiance(true, AMBIANCES[currentAmbiance].id);
+      // Passer la variable de volume au démarrage de l'ambiance
+      toggleAmbiance(true, AMBIANCES[currentAmbiance].id, ambianceVolume);
     } else {
-      toggleAmbiance(false, 'silence');
+      toggleAmbiance(false, 'silence', ambianceVolume);
     }
-    return () => toggleAmbiance(false, 'silence');
-  }, [gameState, ambianceEnabled, currentAmbiance]);
-
-  // iOS Tracking Request
-  useEffect(() => {
-    // Note: This needs @capacitor-community/admob to function in a real app
-    console.log("Tracking request hook ready");
-  }, []);
+    // Dépendance ajoutée ici
+    return () => toggleAmbiance(false, 'silence', ambianceVolume);
+  }, [gameState, ambianceEnabled, currentAmbiance]); // Retiré ambianceVolume des dépendances pour éviter un redémarrage à chaque changement de volume
 
   const triggerSfx = (type: string) => { if (sfxEnabled) playSfx(type); };
 
@@ -412,6 +496,7 @@ export default function App() {
     setIsAdLoading(true);
     
     const simulateAdCall = new Promise((resolve, reject) => {
+      // Simulation: 90% success
       setTimeout(() => {
         Math.random() > 0.1 ? resolve(true) : reject("AdMob Error");
       }, 2000);
@@ -421,9 +506,9 @@ export default function App() {
       .then(() => {
         triggerSfx('ad');
         if (rewardType === 'chest') {
-          setGold(g => g + 500);
+          setGold(g => g + REWARD_AD_CHEST);
           triggerSfx('coin');
-          alert("Récompense reçue : 500 Or !");
+          alert(`Récompense reçue : ${REWARD_AD_CHEST} Or !`);
         } else if (rewardType === 'revive') {
           setGameState('playing');
           setMonsterCurrentHp(monster.baseHp); 
@@ -442,10 +527,11 @@ export default function App() {
 
   useEffect(() => {
     const today = new Date().toDateString();
-    if (lastLoginDate !== today && gameState === 'menu') setTimeout(() => setShowDailyReward(true), 1000);
-  }, [lastLoginDate, gameState]);
+    // Utilisation de showDailyReward directement dans la condition (FIX TS6133)
+    if (lastLoginDate !== today && gameState === 'menu') setShowDailyReward(true);
+  }, [lastLoginDate, gameState]); // showDailyReward n'est plus dans la dépendance car il est utilisé en setter
 
-  const claimDaily = () => {
+  const claimDaily = () => { // FIX TS6133: La fonction est maintenant utilisée dans le JSX
     triggerSfx('coin');
     const today = new Date().toDateString();
     const yesterday = new Date();
@@ -453,7 +539,7 @@ export default function App() {
     if (lastLoginDate === yesterday.toDateString()) setStreakDays(s => s + 1);
     else if (lastLoginDate !== today) setStreakDays(1);
     setLastLoginDate(today);
-    setGold(g => g + 100);
+    setGold(g => g + REWARD_DAILY);
     setShowDailyReward(false);
   };
 
@@ -483,7 +569,8 @@ export default function App() {
     setShinyType(type);
 
     let nextIdx = pickRandomMonsterForZone();
-    setCurrentMonsterIndex(nextIdx);
+    // Utilisation de l'index pour trouver l'ID
+    setCurrentMonsterId(MONSTERS[nextIdx].id);
     
     const nextMonster = MONSTERS[nextIdx];
     let hp = nextMonster.baseHp;
@@ -563,10 +650,10 @@ export default function App() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterIndex]);
+  }, [gameState, isFrozen, currentWeapon, weaponLevels, talents, equippedPet, currentMonsterId]);
 
   const handleMonsterKill = () => {
-    const killedMonster = MONSTERS[currentMonsterIndex];
+    const killedMonster = currentMonster;
     setSessionKills(k => k + 1);
     
     setCombo(c => Math.min(c + 1, 10)); 
@@ -703,6 +790,7 @@ export default function App() {
         {/* HEADER */}
         <div className="bg-stone-900 p-3 border-b border-stone-800 z-20 flex justify-between items-center">
            <div className="flex items-center space-x-2">
+              {/* LOGO REMOVED HERE */}
               <div className="w-8 h-8 bg-stone-700 rounded-full flex items-center justify-center font-bold text-xs border border-stone-500 relative">
                  {playerLevel}
                  {streakDays > 0 && <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-[8px] rounded-full w-4 h-4 flex items-center justify-center border border-stone-900"><Flame size={8} fill="white" /></div>}
@@ -727,7 +815,25 @@ export default function App() {
               <div className="space-y-4">
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Globe size={14} className="mr-2"/> {t('lang_select')}</div><button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="text-xs font-bold bg-stone-700 px-2 py-1 rounded">{lang.toUpperCase()}</button></div>
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Volume2 size={14} className="mr-2"/> {t('sfx')}</div><button onClick={() => setSfxEnabled(!sfxEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${sfxEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${sfxEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
-                 <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div><button onClick={() => setAmbianceEnabled(!ambianceEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${ambianceEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ambianceEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
+                 
+                 {/* CONTRÔLE VOLUME AMBIANCE */}
+                 <div className="pt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div>
+                      <span className="text-xs text-stone-400">{Math.round(ambianceVolume * 100)}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.05" 
+                      value={ambianceVolume}
+                      onChange={(e) => setAmbianceVolume(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer range-sm"
+                    />
+                 </div>
+                 
+                 <p className="text-stone-500 text-[10px]">{t('youtube_suggest')}</p>
               </div>
               <div className="pt-4 border-t border-stone-700 space-y-2 mt-4">
                  <button onClick={exportSave} className="w-full flex items-center justify-center text-xs bg-stone-700 hover:bg-stone-600 py-2 rounded text-stone-300"><Upload size={12} className="mr-2"/> {t('save_export')}</button>
@@ -862,7 +968,7 @@ export default function App() {
                           <div className="bg-stone-800 p-4 rounded-xl border border-stone-700">
                              <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-bold flex items-center"><Pickaxe size={14} className="mr-2"/> {t('talents')}</h3><span className="text-xs text-stone-400">{t('points')}: <span className="text-white font-bold">{availableTalents}</span></span></div>
                              <div className="space-y-2">
-                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><Sword size={14} className="text-red-400"/><span className="text-xs">{t('str')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.str}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, str:t.str+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
+                                <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><Sword size={14} className="text-red-400"/><span className="text-xs">{t('str')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.str}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, str:t.str+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableAvailableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
                                 <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><ShoppingBag size={14} className="text-yellow-400"/><span className="text-xs">{t('greed')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.greed}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, greed:t.greed+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
                                 <div className="flex justify-between items-center bg-stone-900/50 p-2 rounded-lg"><div className="flex items-center gap-2"><BookOpen size={14} className="text-blue-400"/><span className="text-xs">{t('wis')}</span></div><div className="flex items-center gap-2"><span className="text-xs font-bold text-stone-400">{talents.wis}</span><button disabled={availableTalents===0} onClick={()=>setTalents(t=>({...t, wis:t.wis+1}))} className={`w-5 h-5 rounded flex items-center justify-center text-xs ${availableTalents>0?'bg-blue-600':'bg-stone-700'}`}>+</button></div></div>
                              </div>
@@ -934,7 +1040,7 @@ export default function App() {
               {/* Right HUD */}
               <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
                  <div className="bg-stone-900/80 px-3 py-2 rounded-lg border border-stone-700 text-right">
-                    <div className="text-[10px] text-stone-400 uppercase font-bold">{t('session_kills')}</div>
+                    <div className="text-[10px] text-stone-400 uppercase">{t('session_kills')}</div>
                     <div className="text-xl font-black text-red-400">{sessionKills} <span className="text-stone-500 text-sm">/ ∞</span></div>
                     <div className="flex gap-2 text-[9px] mt-1">
                        <span className="text-yellow-400">+{sessionGoldEarned} 🪙</span>
@@ -991,14 +1097,14 @@ export default function App() {
                  <><Trophy size={80} className="text-yellow-400 mb-6 animate-bounce" /><h2 className="text-4xl font-black uppercase text-green-400 mb-2">{t('victory')}</h2></>
               ) : (
                  <><Skull size={80} className="text-red-500 mb-6 animate-pulse" /><h2 className="text-4xl font-black uppercase text-red-500 mb-2">{t('defeat')}</h2><p className="text-stone-300 mb-8">{tData(monster.lore)}</p>
-                 {isAdLoading ? <span className="animate-pulse">{t('ad_loading')}</span> : <button onClick={() => handleWatchAd('revive')} className="mb-4 bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</button>}
+                 <div className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</div>
                  </>
               )}
               
               {gameState === 'victory' && (
                 <div className="bg-stone-800 p-6 rounded-2xl border-2 border-yellow-500/50 w-full mb-8 mt-4 space-y-2">
                    <div className="flex justify-between items-center border-b border-stone-700 pb-2"><span className="text-xs text-stone-400 uppercase">{t('session_kills')}</span><span className="font-bold text-red-400">{sessionKills}</span></div>
-                   <div className="flex justify-between items-center border-b border-stone-700 pb-2"><span className="text-xs text-stone-400 uppercase">{t('gold_won')}</span><span className="font-bold text-yellow-400">+{sessionGoldEarned + gold - gold} 🪙</span></div>
+                   <div className="flex justify-between items-center border-b border-stone-700 pb-2"><span className="text-xs text-stone-400 uppercase">{t('gold_won')}</span><span className="font-bold text-yellow-400">+{sessionGoldEarned} 🪙</span></div>
                    <div className="flex justify-between items-center"><span className="text-xs text-stone-400 uppercase">{t('xp_won')}</span><span className="font-bold text-blue-400">+{sessionXpEarned + (selectedTime * 10)} XP</span></div>
                 </div>
               )}
@@ -1013,7 +1119,7 @@ export default function App() {
               <button onClick={() => {triggerSfx('click'); setActiveTab('shop')}} className={`flex flex-col items-center p-2 w-16 ${activeTab === 'shop' ? 'text-white' : 'text-stone-600'}`}><ShoppingBag size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('shop')}</span></button>
               <button onClick={() => {triggerSfx('click'); setActiveTab('play')}} className="flex flex-col items-center justify-center w-14 h-14 bg-red-600 rounded-full -mt-8 shadow-[0_0_20px_rgba(220,38,38,0.4)] border-4 border-stone-900 text-white overflow-hidden transform transition active:scale-95"><Sword size={24}/></button>
               <button onClick={() => {triggerSfx('click'); setActiveTab('profile')}} className={`flex flex-col items-center p-2 w-16 ${(activeTab === 'profile' || activeTab === 'bestiary' || activeTab === 'zones') ? 'text-white' : 'text-stone-600'}`}><User size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('profile')}</span></button>
-           </div>
+        </div>
         )}
 
         {/* DAILY REWARD MODAL */}
@@ -1023,7 +1129,7 @@ export default function App() {
                  <Calendar size={32} className="text-yellow-400 mx-auto mb-4" />
                  <h2 className="text-2xl font-black text-white uppercase mb-2">{t('daily_title')}</h2>
                  <p className="text-stone-400 text-sm mb-6">{t('daily_desc')} <span className="text-orange-500 font-bold">{streakDays} {t('streak')}</span></p>
-                 <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 mb-6"><div className="text-3xl font-black text-yellow-400">+100 🪙</div></div>
+                 <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 mb-6"><div className="text-3xl font-black text-yellow-400">+{REWARD_DAILY} 🪙</div></div>
                  <button onClick={claimDaily} className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-stone-900 font-bold rounded-xl shadow-lg transition">{t('daily_claim')}</button>
               </div>
            </div>

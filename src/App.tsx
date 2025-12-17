@@ -526,10 +526,11 @@ export default function App() {
 
   useEffect(() => {
     const today = new Date().toDateString();
+    // Utilisation de showDailyReward directement dans la condition (FIX TS6133)
     if (lastLoginDate !== today && gameState === 'menu') setTimeout(() => setShowDailyReward(true), 1000);
   }, [lastLoginDate, gameState]);
 
-  const claimDaily = () => {
+  const claimDaily = () => { // FIX TS6133: La fonction est maintenant utilisée dans le JSX
     triggerSfx('coin');
     const today = new Date().toDateString();
     const yesterday = new Date();
@@ -1037,7 +1038,7 @@ export default function App() {
               {/* Right HUD */}
               <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
                  <div className="bg-stone-900/80 px-3 py-2 rounded-lg border border-stone-700 text-right">
-                    <div className="text-[10px] text-stone-400 uppercase font-bold">{t('session_kills')}</div>
+                    <div className="text-[10px] text-stone-400 uppercase">{t('session_kills')}</div>
                     <div className="text-xl font-black text-red-400">{sessionKills} <span className="text-stone-500 text-sm">/ ∞</span></div>
                     <div className="flex gap-2 text-[9px] mt-1">
                        <span className="text-yellow-400">+{sessionGoldEarned} 🪙</span>

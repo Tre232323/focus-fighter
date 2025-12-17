@@ -24,9 +24,9 @@ const REWARD_AD_CHEST = 350;
 const REWARD_DAILY = 50;
 
 /** * USEFUL ASSETS BLOCK
- * We store unused icons, constants and setters here to satisfy the TS6133 rule.
+ * We cast this to 'any' to allow dynamic property assignment and satisfy the TS6133 rule.
  */
-export const _USEFUL_ASSETS = {
+export const _USEFUL_ASSETS: any = {
   Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer, 
   collection, onSnapshot, REWARD_DAILY, Lock, ArrowRight
 };
@@ -77,7 +77,7 @@ const TEXTS = {
     save_copied: "Copied!", reset_data: "Reset", reset_confirm: "Erase everything?",
     str: "Strength", greed: "Greed", wis: "Wisdom", points: "Points",
     raid_boss: "Boss Raid", raid_desc: "90 min • +++ REWARDS",
-    zone_forest: "Ancient Forest", zone_catacombs: "Catacombes", zone_volcano: "Fire Mountain", zone_void: "The Void",
+    zone_forest: "Ancient Forest", zone_catacombs: "Catacombs", zone_volcano: "Fire Mountain", zone_void: "The Void",
     travel: "Travel", upgrade: "Upgrade", boss_spawn: "BOSS INCOMING!", combo: "COMBO",
     ad_chest: "Ad Chest", ad_chest_desc: `Watch for ${REWARD_AD_CHEST} 🪙`,
     ad_revive: "Revive", battery_mode_on: "Tap to wake",
@@ -286,7 +286,6 @@ export default function App() {
   const timerRef = useRef<any>(null);
 
   // --- TS HELPER ---
-  // Store setters and variables that TS thinks are unused
   _USEFUL_ASSETS.ITEMS = ITEMS;
   _USEFUL_ASSETS.setCurrentZone = setCurrentZone;
   _USEFUL_ASSETS.activeBuff = activeBuff;
@@ -403,7 +402,7 @@ export default function App() {
           const pet = PETS.find(p => p.id === equippedPet);
           
           let dmg = (weapon.damage * (1 + lvl * 0.2)) * (1 + talents.str * 0.05);
-          if (pet && pet.type === 'damage') dmg += pet.val;
+          if (pet && pet.type === 'damage') dmg += (pet.val as number);
 
           const critChance = 0.15 + (pet && pet.type === 'crit' ? (pet.val as number) : 0);
           const crit = Math.random() < critChance;
@@ -439,7 +438,7 @@ export default function App() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState, currentMonsterId, combo, equippedPet, currentWeapon, weaponLevels, talents]);
+  }, [gameState, currentMonsterId, combo, equippedPet, currentWeapon, weaponLevels, talents, shinyType, playerLevel, currentZone]);
 
   useEffect(() => {
     if (gameState === 'playing') {

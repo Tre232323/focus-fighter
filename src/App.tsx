@@ -457,7 +457,10 @@ export default function App() {
   const multXp = (1 + (talents.wis * 0.05)) * zoneObj.mult;
 
   const t = (key: keyof typeof TEXTS.fr) => TEXTS[lang][key];
-  const tData = (data: { fr: string, en: string }) => data[lang];
+  // FIX: Adapter tData pour gérer les types de TEXTS qui n'ont pas la clé 'en' ou 'fr' (s'ils existent)
+  const tData = (data: { [key in Lang]?: string } & { [key: string]: string }) => {
+    return data[lang] || data.fr || data.en || '???';
+  };
 
   // METTRE À JOUR LE VOLUME QUAND L'ÉTAT CHANGE
   useEffect(() => {
@@ -1096,7 +1099,7 @@ export default function App() {
                  <><Trophy size={80} className="text-yellow-400 mb-6 animate-bounce" /><h2 className="text-4xl font-black uppercase text-green-400 mb-2">{t('victory')}</h2></>
               ) : (
                  <><Skull size={80} className="text-red-500 mb-6 animate-pulse" /><h2 className="text-4xl font-black uppercase text-red-500 mb-2">{t('defeat')}</h2><p className="text-stone-300 mb-8">{tData(monster.lore)}</p>
-                 <div className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</div>
+                 {isAdLoading ? <span className="animate-pulse">{t('ad_loading')}</span> : <button onClick={() => handleWatchAd('revive')} className="mb-4 bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</button>}
                  </>
               )}
               

@@ -16,21 +16,21 @@ declare global {
 }
 
 // Fonction de simulation gtag (utilisée dans le code)
-export const gtag = (action: string, params: Record<string, any>) => { // EXPORTÉ pour FIX TS6133
+export const gtag = (action: string, params: Record<string, any>) => { 
     if (typeof window.gtag === 'function') {
         window.gtag('event', action, params);
     } else {
-        // console.log(`GA Event: ${action}`, params); // Commenté pour réduire le bruit
+        // console.log(`GA Event: ${action}`, params); 
     }
 };
 
 // Initialisation de Firebase simulée/neutralisée
-export const firebaseConfig = { // EXPORTÉ pour FIX TS6133
+export const firebaseConfig = { 
   apiKey: "AIzaSyDLF3_irPzw5jq_LhRvuqQo2SZosX5u8Ik",
   projectId: "focus-fighter-rpg",
   measurementId: "G-2MY7J82JBN"
 }; 
-export const GA_MEASUREMENT_ID = firebaseConfig.measurementId; // EXPORTÉ pour FIX TS6133
+export const GA_MEASUREMENT_ID = firebaseConfig.measurementId; 
 
 // --- AUDIO ENGINE AMBIANCE (SONS RÉELS BASE64) ---
 const AMBIANCE_SOUNDS: Record<string, string> = {
@@ -60,7 +60,6 @@ const initAudio = () => {
 
 const playAmbianceFromBase64 = async (ctx: AudioContext, audioData: string, type: string, volume: number) => {
     if (audioData.startsWith('uploaded:')) {
-      // console.warn("Utilisation du fallback procédural car les données Base64 réelles ne sont pas disponibles dans AMBIANCE_SOUNDS.");
       startProceduralAmbiance(ctx, type, volume);
       return;
     }
@@ -141,14 +140,11 @@ const toggleAmbiance = (enable: boolean, type: string, volume: number) => {
   const audioData = AMBIANCE_SOUNDS[type];
   
   if (audioData && audioData.length > 0) {
-      // Tenter de lire le fichier Base64 (véritable son)
       playAmbianceFromBase64(ctx, audioData, type, volume).catch(e => {
           console.error("Erreur de lecture Base64 (fallback):", e);
-          // Fallback en cas d'erreur
           startProceduralAmbiance(ctx, type, volume);
       });
   } else {
-      // Fallback: Génération de bruit blanc
       startProceduralAmbiance(ctx, type, volume);
   }
 };
@@ -263,7 +259,7 @@ const TEXTS = {
     settings: "Settings", sfx: "Sound FX", ambiance: "Ambiance",
     minutes: "Minutes", backpack: "Backpack", weapons: "Weapons", potions: "Potions", pets: "Pets",
     level: "Level", xp: "XP", gold: "Gold", kills: "Kills", hours: "Hours", streak: "Streak",
-    hp: "HP", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
+    hp: "PV", damage: "Damage", cost: "Cost", owned: "Owned", equipped: "Equipped",
     victory: "Session Complete!", defeat: "Defeat", gold_won: "Gold Won", xp_won: "XP Won", session_kills: "Monsters defeated",
     return_menu: "Return to Menu", give_up: "Give Up", focus_active: "Focus Active",
     freeze_active: "STASIS", freeze_desc: "Come back quick!",
@@ -300,7 +296,8 @@ const MONSTERS = [
   { id: 'wolf', baseHp: 600, xp: 50, color: "text-stone-400", name: { fr: "Loup", en: "Wolf" }, lore: { fr: "Chasse en meute.", en: "Hunts in packs." } },
   { id: 'goblin', baseHp: 800, xp: 60, color: "text-green-700", name: { fr: "Gobelin", en: "Goblin" }, lore: { fr: "Voleur.", en: "Thief." } },
   { id: 'treant', baseHp: 1500, xp: 100, color: "text-green-900", name: { fr: "Tréant", en: "Treant" }, lore: { fr: "Lent mais solide.", en: "Slow but tough." } },
-  { id: 'skeleton', baseHp: 2000, xp: 150, color: "text-stone-300", name: { fr: "Squelette", en: "Skeleton" }, lore: { fr: "Claque des dents.", in: "Rattles." } },
+  // FIX TS2345: Correction de la clé "in" -> "en"
+  { id: 'skeleton', baseHp: 2000, xp: 150, color: "text-stone-300", name: { fr: "Squelette", en: "Skeleton" }, lore: { fr: "Claque des dents.", en: "Rattles." } },
   { id: 'bat_mob', baseHp: 1800, xp: 140, color: "text-purple-400", name: { fr: "Vampire", en: "Vampire" }, lore: { fr: "Suceur de sang.", en: "Blood sucker." } },
   { id: 'ghost_mob', baseHp: 2500, xp: 180, color: "text-cyan-300", name: { fr: "Spectre", en: "Specter" }, lore: { fr: "Intangible.", en: "Intangible." } },
   { id: 'zombie', baseHp: 3000, xp: 200, color: "text-green-800", name: { fr: "Zombie", en: "Zombie" }, lore: { fr: "Cerveauuu...", en: "Braaains..." } },
@@ -313,6 +310,7 @@ const MONSTERS = [
   { id: 'shadow', baseHp: 30000, xp: 1500, color: "text-gray-900", name: { fr: "Ombre", en: "Shadow" }, lore: { fr: "Votre pire ennemi.", en: "Your worst enemy." } },
   { id: 'beholder', baseHp: 45000, xp: 2000, color: "text-purple-300", name: { fr: "Observateur", en: "Beholder" }, lore: { fr: "Il voit tout.", en: "Sees all." } },
   { id: 'cultist', baseHp: 60000, xp: 2500, color: "text-red-900", name: { fr: "Cultiste", en: "Cultist" }, lore: { fr: "Fou.", en: "Mad." } },
+  { id: 'cthulhu', baseHp: 100000, xp: 4000, color: "text-green-900", name: { fr: "Ancien", en: "Ancient One" }, lore: { fr: "Indescriptible.", en: "Indescribable." } },
   { id: 'demon', baseHp: 250000, xp: 10000, color: "text-red-950", name: { fr: "Roi Démon", en: "Demon King" }, lore: { fr: "Le boss final.", en: "The final boss." } },
 ];
 
@@ -397,7 +395,7 @@ export default function App() {
   
   const [sfxEnabled, setSfxEnabled] = useStickyState(true, 'ff_sfx');
   const [ambianceEnabled, setAmbianceEnabled] = useStickyState(false, 'ff_ambiance');
-  const [ambianceVolume, setAmbianceVolume] = useStickyState(0.5, 'ff_ambiance_volume'); // NOUVEAU: Volume de l'ambiance
+  const [ambianceVolume, setAmbianceVolume] = useStickyState(0.5, 'ff_ambiance_volume');
 
   // FIX TS2367: Ajout de 'bestiary' et 'zones' aux types de 'activeTab'
   type TabType = 'play' | 'shop' | 'profile' | 'zones' | 'bestiary'; 
@@ -424,7 +422,6 @@ export default function App() {
   const [freezeTimeLeft, setFreezeTimeLeft] = useState(0);
   const [isFrozen, setIsFrozen] = useState(false);
 
-  // FIX: Retiré l'état currentMonsterIndex car la logique utilise currentMonsterId
   const [currentMonsterId, setCurrentMonsterId] = useState<string>('slime');
   const currentMonster = MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0];
   
@@ -441,7 +438,6 @@ export default function App() {
   const freezeIntervalRef = useRef<number | null>(null);
   const comboIntervalRef = useRef<number | null>(null);
   
-  // FIX: Utiliser currentMonsterId au lieu de currentMonsterIndex dans les dépendances
   const monster = currentMonster; 
   const weapon = WEAPONS[currentWeapon];
   const weaponLvl = weaponLevels[currentWeapon] || 0;
@@ -457,10 +453,7 @@ export default function App() {
   const multXp = (1 + (talents.wis * 0.05)) * zoneObj.mult;
 
   const t = (key: keyof typeof TEXTS.fr) => TEXTS[lang][key];
-  // FIX: Adapter tData pour gérer les types de TEXTS qui n'ont pas la clé 'en' ou 'fr' (s'ils existent)
-  const tData = (data: { [key in Lang]?: string } & { [key: string]: string }) => {
-    return data[lang] || data.fr || data.en || '???';
-  };
+  const tData = (data: { fr: string, en: string }) => data[lang];
 
   // METTRE À JOUR LE VOLUME QUAND L'ÉTAT CHANGE
   useEffect(() => {
@@ -544,6 +537,8 @@ export default function App() {
     setGold(g => g + REWARD_DAILY);
     setShowDailyReward(false);
   };
+
+  // ... (Suite du code pour la logique de jeu, inchangée)
 
   const pickRandomMonsterForZone = () => {
     const allowedMonsters = zoneObj.monsters;
@@ -816,26 +811,31 @@ export default function App() {
               <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-sm">{t('settings')}</h3><button onClick={() => setShowSettings(false)}><X size={16}/></button></div>
               <div className="space-y-4">
                  <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Globe size={14} className="mr-2"/> {t('lang_select')}</div><button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="text-xs font-bold bg-stone-700 px-2 py-1 rounded">{lang.toUpperCase()}</button></div>
-                 <div className="flex justify-between items-center"><div className="flex items-center text-xs text-stone-300"><Volume2 size={14} className="mr-2"/> {t('sfx')}</div><button onClick={() => setSfxEnabled(!sfxEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${sfxEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${sfxEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div>
-                 
-                 {/* CONTRÔLE VOLUME AMBIANCE */}
-                 <div className="pt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div>
-                      <span className="text-xs text-stone-400">{Math.round(ambianceVolume * 100)}%</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="1" 
-                      step="0.05" 
-                      value={ambianceVolume}
-                      onChange={(e) => setAmbianceVolume(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer range-sm"
-                    />
+                 <div className="flex justify-between items-center">
+                    <div className="flex items-center text-xs text-stone-300"><Volume2 size={14} className="mr-2"/> {t('sfx')}</div>
+                    <button onClick={() => setSfxEnabled(!sfxEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${sfxEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${sfxEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button>
                  </div>
                  
-                 <p className="text-stone-500 text-[10px]">{t('youtube_suggest')}</p>
+                 {/* CONTRÔLE AMBIANCE (ON/OFF + VOLUME) - FIX TS6133 */}
+                 <div className="pt-2 border-t border-stone-700 mt-2">
+                    <div className="flex justify-between items-center mb-2">
+                       <div className="flex items-center text-xs text-stone-300"><Music size={14} className="mr-2"/> {t('ambiance')}</div>
+                       <button onClick={() => setAmbianceEnabled(!ambianceEnabled)} className={`w-8 h-4 rounded-full relative transition-colors ${ambianceEnabled ? 'bg-green-500' : 'bg-stone-600'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${ambianceEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button>
+                    </div>
+                    {ambianceEnabled && (
+                        <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05" 
+                        value={ambianceVolume}
+                        onChange={(e) => setAmbianceVolume(parseFloat(e.target.value))}
+                        className="w-full h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer range-sm"
+                        />
+                    )}
+                 </div>
+                 
+                 <p className="text-stone-500 text-[10px] mt-2">{t('youtube_suggest')}</p>
               </div>
               <div className="pt-4 border-t border-stone-700 space-y-2 mt-4">
                  <button onClick={exportSave} className="w-full flex items-center justify-center text-xs bg-stone-700 hover:bg-stone-600 py-2 rounded text-stone-300"><Upload size={12} className="mr-2"/> {t('save_export')}</button>
@@ -1068,13 +1068,14 @@ export default function App() {
               {/* Monster */}
               <div className={`flex-1 flex flex-col items-center justify-center relative transition-transform duration-75 ${isHit ? 'translate-x-1 translate-y-1' : ''}`}>
                  <div className={`relative z-10 transition-transform duration-100 ${isHit ? 'scale-95 brightness-150' : 'animate-bounce-slow'}`}>
-                    <MonsterAvatar id={monster.id} color={monster.color} isBoss={shinyType === 'boss'} />
+                    {/* Utilisation de currentMonster partout pour corriger la ReferenceError */}
+                    <MonsterAvatar id={currentMonster.id} color={currentMonster.color} isBoss={shinyType === 'boss'} /> 
                     {isHit && <div className={`absolute top-0 right-0 font-black text-4xl animate-ping select-none ${isCrit ? 'text-yellow-400 scale-150' : 'text-red-500'}`}>-{lastDamage}</div>}
                  </div>
                  <div className="w-48 mt-8 bg-stone-900 rounded-full h-3 border border-stone-600 overflow-hidden relative">
-                    <div className={`h-full transition-all duration-300 ${monster.color.replace('text-','bg-')}`} style={{ width: `${Math.min(100, (monsterCurrentHp / (monster.baseHp * (shinyType==='boss'?5:1) * (1+(playerLevel*0.05)))) * 100)}%` }}></div>
+                    <div className={`h-full transition-all duration-300 ${currentMonster.color.replace('text-','bg-')}`} style={{ width: `${Math.min(100, (monsterCurrentHp / (currentMonster.baseHp * (shinyType==='boss'?5:1) * (1+(playerLevel*0.05)))) * 100)}%` }}></div>
                  </div>
-                 <div className="mt-2 text-xs font-bold text-stone-400">{Math.ceil(monsterCurrentHp)} / {Math.ceil(monster.baseHp * (shinyType==='boss'?5:1) * (1+(playerLevel*0.05)))}</div>
+                 <div className="mt-2 text-xs font-bold text-stone-400">{Math.ceil(monsterCurrentHp)} / {Math.ceil(currentMonster.baseHp * (shinyType==='boss'?5:1) * (1+(playerLevel*0.05)))}</div>
               </div>
 
               {/* Controls */}
@@ -1087,7 +1088,7 @@ export default function App() {
                     {weapon.icon}
                     {activePetObj && <div className="absolute -right-8 top-0 text-3xl animate-bounce" style={{animationDuration: '2s'}}>{activePetObj.icon}</div>}
                  </div>
-                 <button onClick={() => setGameState('defeat')} className="absolute bottom-4 right-4 text-stone-600 hover:text-red-500 text-xs font-bold uppercase">{t('give_up')}</button>
+                 <button onClick={() => endBattle(false)} className="absolute bottom-4 right-4 text-stone-600 hover:text-red-500 text-xs font-bold uppercase">{t('give_up')}</button>
               </div>
            </div>
         )}
@@ -1099,7 +1100,7 @@ export default function App() {
                  <><Trophy size={80} className="text-yellow-400 mb-6 animate-bounce" /><h2 className="text-4xl font-black uppercase text-green-400 mb-2">{t('victory')}</h2></>
               ) : (
                  <><Skull size={80} className="text-red-500 mb-6 animate-pulse" /><h2 className="text-4xl font-black uppercase text-red-500 mb-2">{t('defeat')}</h2><p className="text-stone-300 mb-8">{tData(monster.lore)}</p>
-                 {isAdLoading ? <span className="animate-pulse">{t('ad_loading')}</span> : <button onClick={() => handleWatchAd('revive')} className="mb-4 bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</button>}
+                 <div className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><Video size={20}/> {t('ad_revive')}</div>
                  </>
               )}
               
@@ -1116,26 +1117,11 @@ export default function App() {
         )}
 
         {/* BOTTOM NAV */}
-        {gameState === 'menu' && (
-           <div className="absolute bottom-0 left-0 right-0 bg-stone-900 border-t border-stone-800 p-2 flex justify-around items-center h-20 z-30">
-              <button onClick={() => {triggerSfx('click'); setActiveTab('shop')}} className={`flex flex-col items-center p-2 w-16 ${activeTab === 'shop' ? 'text-white' : 'text-stone-600'}`}><ShoppingBag size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('shop')}</span></button>
-              <button onClick={() => {triggerSfx('click'); setActiveTab('play')}} className="flex flex-col items-center justify-center w-14 h-14 bg-red-600 rounded-full -mt-8 shadow-[0_0_20px_rgba(220,38,38,0.4)] border-4 border-stone-900 text-white overflow-hidden transform transition active:scale-95"><Sword size={24}/></button>
-              <button onClick={() => {triggerSfx('click'); setActiveTab('profile')}} className={`flex flex-col items-center p-2 w-16 ${(activeTab === 'profile' || activeTab === 'bestiary' || activeTab === 'zones') ? 'text-white' : 'text-stone-600'}`}><User size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('profile')}</span></button>
+        <div className="absolute bottom-0 left-0 right-0 bg-stone-900 border-t border-stone-800 p-2 flex justify-around items-center h-20 z-30">
+            <button onClick={() => {triggerSfx('click'); setActiveTab('shop')}} className={`flex flex-col items-center p-2 w-16 ${activeTab === 'shop' ? 'text-white' : 'text-stone-600'}`}><ShoppingBag size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('shop')}</span></button>
+            <button onClick={() => {triggerSfx('click'); setActiveTab('play')}} className="flex flex-col items-center justify-center w-14 h-14 bg-red-600 rounded-full -mt-8 shadow-[0_0_20px_rgba(220,38,38,0.4)] border-4 border-stone-900 text-white overflow-hidden transform transition active:scale-95"><Sword size={24}/></button>
+            <button onClick={() => {triggerSfx('click'); setActiveTab('profile')}} className={`flex flex-col items-center p-2 w-16 ${(activeTab === 'profile' || activeTab === 'bestiary' || activeTab === 'zones') ? 'text-white' : 'text-stone-600'}`}><User size={20}/><span className="text-[9px] uppercase font-bold mt-1">{t('profile')}</span></button>
         </div>
-        )}
-
-        {/* DAILY REWARD MODAL */}
-        {showDailyReward && (
-           <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
-              <div className="bg-stone-800 border-2 border-yellow-500 rounded-2xl p-6 text-center shadow-[0_0_50px_rgba(234,179,8,0.2)] animate-in fade-in zoom-in duration-300">
-                 <Calendar size={32} className="text-yellow-400 mx-auto mb-4" />
-                 <h2 className="text-2xl font-black text-white uppercase mb-2">{t('daily_title')}</h2>
-                 <p className="text-stone-400 text-sm mb-6">{t('daily_desc')} <span className="text-orange-500 font-bold">{streakDays} {t('streak')}</span></p>
-                 <div className="bg-stone-900 p-4 rounded-xl border border-stone-700 mb-6"><div className="text-3xl font-black text-yellow-400">+{REWARD_DAILY} 🪙</div></div>
-                 <button onClick={claimDaily} className="w-full py-3 bg-yellow-500 hover:bg-yellow-400 text-stone-900 font-bold rounded-xl shadow-lg transition">{t('daily_claim')}</button>
-              </div>
-           </div>
-        )}
 
         {/* SAFE BANNER AD */}
         <SafeAdBanner />

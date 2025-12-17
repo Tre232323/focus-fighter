@@ -1,0 +1,130 @@
+name: Build iOS App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          npm install -D tailwindcss@3.4.17 postcss autoprefixer
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Install & Sync Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/ios
+          
+          # Nettoyage et Initialisation propre
+          rm -rf ios
+          rm capacitor.config.ts || true
+          rm capacitor.config.json || true
+          
+          # Initialisation (CHANGEMENT ICI)
+          npx cap init "Focus Fighter RPG" "com.tonnom.focusfighter" --web-dir dist
+          
+          # Ajout de la plateforme iOS
+          npx cap add ios
+          
+          # Synchronisation automatique
+          npx cap sync ios
+
+      # Installation des Certificats et Extraction des IDs
+      - name: Install Certificate and Profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Création des chemins
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_profile.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Décodage des secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
+
+          # Création du trousseau
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import du certificat
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Copie du profil
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles
+
+          # Extraction automatique des IDs
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i $PP_PATH))
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c "Print TeamIdentifier:0" /dev/stdin <<< $(security cms -D -i $PP_PATH))
+          
+          echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "TEAM_ID=$TEAM_ID" >> $GITHUB_ENV
+
+      # Compilation avec Xcode
+      - name: Build IPA
+        run: |
+          cd ios/App
+          
+          # --- FIX EXPORT PLIST : Génération via PlistBuddy (Plus robuste) ---
+          # On crée le fichier proprement au lieu de l'écrire en texte
+          /usr/libexec/PlistBuddy -c "Add :method string app-store" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :teamID string ${{ env.TEAM_ID }}" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" exportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.tonnom.focusfighter string ${{ env.PROFILE_UUID }}" exportOptions.plist
+          
+          # Archive
+          xcodebuild -project App.xcodeproj \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath $PWD/build/App.xcarchive \
+            clean archive \
+            PROVISIONING_PROFILE="${{ env.PROFILE_UUID }}" \
+            DEVELOPMENT_TEAM="${{ env.TEAM_ID }}" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE="Manual"
+
+          # Export IPA
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/App.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath $PWD/build \
+            -allowProvisioningUpdates
+
+      # Sauvegarder le fichier IPA généré sur GitHub
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: ios/App/build/App.ipa
+
+      # Envoi Automatique vers l'App Store Connect
+      - name: Upload to App Store Connect (via altool)
+        run: |
+          # --- AVERTISSEMENT CRITIQUE ---
+          # Si cette étape échoue avec "Failed to get authorization":
+          # 1. Vérifiez que APPLE_ID est votre adresse email Apple Developer.
+          # 2. Vérifiez que APPLE_APP_SPECIFIC_PASSWORD est le mot de passe généré
+          #    sur appleid.apple.com (il n'est PAS votre mot de passe principal).
+          xcrun altool --upload-app -f ios/App/build/App.ipa -t ios -u "${{ secrets.APPLE_ID }}" -p "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"

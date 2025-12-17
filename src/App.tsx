@@ -1023,6 +1023,5 @@ export default function App() {
         {/* Note: Ce composant doit être au-dessus de la nav bar si présente */}
         {gameState === 'menu' ? null : <SafeAdBanner />} 
       </div>
-    </div>
   );
 }

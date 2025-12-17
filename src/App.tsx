@@ -1,107 +1,34 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Sword, Skull, Trophy, Shield, ShoppingBag, User, 
-  Lock, Settings, Upload, ArrowRight, Pickaxe, Video, 
+  Sword, Skull, Zap, Trophy, Shield, ShoppingBag, Music, User, 
+  Calendar, Lock, BookOpen, Settings, Volume2, Flame, Hourglass, 
+  Globe, Download, Upload, Hammer, ArrowRight, Pickaxe, Video, 
   Battery, EyeOff, X
 } from 'lucide-react';
 
-// @ts-ignore
-import { initializeApp } from 'firebase/app';
-// @ts-ignore
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-// @ts-ignore
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+// Imports Firebase via CDN pour garantir la résolution lors du build
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js';
 
-// --- TS VALIDATION & GLOBALS ---
+// --- CONFIGURATION & GLOBALS ---
 declare const __firebase_config: string | undefined;
 declare const __app_id: string | undefined;
 declare const __initial_auth_token: string | undefined;
 
-// Unused imports/constants "Useful" block to satisfy compiler
-import { 
-  Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer 
-} from 'lucide-react';
-
-export const REWARD_DAILY = 50;
-// Exporting this satisfies TS6133 as it's considered an external-facing member
-export const _USEFUL_FOR_LATER = { Zap, Music, Calendar, BookOpen, Volume2, Flame, Hourglass, Globe, Download, Hammer, REWARD_DAILY };
-
-// --- CONFIGURATION & CONSTANTES ---
-const REWARD_AD_CHEST = 350;
-
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'focus-fighter-rpg';
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
-  : { apiKey: "", projectId: "focus-fighter-rpg", authDomain: "focus-fighter-rpg.firebaseapp.com" };
+  : { apiKey: "", projectId: "focus-fighter-rpg" };
 
+// Initialisation Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- AUDIO ENGINE ---
-let audioCtx: AudioContext | null = null;
-let ambianceNode: AudioBufferSourceNode | null = null;
-let ambianceGain: GainNode | null = null;
-let lfoNode: OscillatorNode | null = null;
-
-const initAudio = () => {
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    audioCtx = new AudioContextClass();
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
-};
-
-const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number) => {
-  if (ambianceNode) { try { ambianceNode.stop(); } catch(e) {} }
-  if (lfoNode) { try { lfoNode.stop(); } catch(e) {} }
-
-  const bufferSize = ctx.sampleRate * 2;
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  let lastOut = 0;
-  
-  for (let i = 0; i < bufferSize; i++) {
-    const white = Math.random() * 2 - 1;
-    lastOut = (lastOut + (0.02 * white)) / 1.02;
-    data[i] = lastOut * 3.5;
-    if (type === 'rain') data[i] *= 1.2;
-    if (type === 'river') data[i] = (lastOut + white * 0.1) * 2;
-  }
-
-  ambianceNode = ctx.createBufferSource();
-  ambianceNode.buffer = buffer;
-  ambianceNode.loop = true;
-  ambianceGain = ctx.createGain();
-  ambianceGain.gain.value = volume * 0.2;
-
-  const filter = ctx.createBiquadFilter();
-  if (type === 'rain') { filter.type = 'lowpass'; filter.frequency.value = 1200; }
-  else if (type === 'fire') { filter.type = 'lowpass'; filter.frequency.value = 400; ambianceGain.gain.value *= 0.5; }
-  else if (type === 'wind') {
-    filter.type = 'bandpass'; filter.frequency.value = 500; filter.Q.value = 1;
-    lfoNode = ctx.createOscillator(); lfoNode.type = 'sine'; lfoNode.frequency.value = 0.2;
-    const lfoGain = ctx.createGain(); lfoGain.gain.value = 300;
-    lfoNode.connect(lfoGain); lfoGain.connect(filter.frequency); lfoNode.start();
-  } else if (type === 'space') { filter.type = 'lowpass'; filter.frequency.value = 100; }
-  else { filter.type = 'lowpass'; filter.frequency.value = 800; }
-
-  ambianceNode.connect(filter);
-  filter.connect(ambianceGain);
-  ambianceGain.connect(ctx.destination);
-  ambianceNode.start(0);
-};
-
-const toggleAmbiance = (enable: boolean, type: string, volume: number) => {
-  const ctx = initAudio();
-  if (!enable || type === 'silence') {
-    if (ambianceNode) { try { ambianceNode.stop(); } catch(e) {} ambianceNode = null; }
-    if (lfoNode) { try { lfoNode.stop(); } catch(e) {} lfoNode = null; }
-    return;
-  }
-  startProceduralAmbiance(ctx, type, volume);
-};
+// --- CONSTANTES DE RÉCOMPENSE ---
+const REWARD_DAILY = 50;
+const REWARD_AD_CHEST = 350;
 
 // --- DATA ---
 const TEXTS = {
@@ -113,9 +40,9 @@ const TEXTS = {
     hp: "PV", damage: "Dégâts", cost: "Coût", owned: "Acquis", equipped: "Équipé",
     victory: "Session Terminée !", defeat: "Échec", gold_won: "Or Gagné", xp_won: "XP Gagné", session_kills: "Vaincus",
     return_menu: "Retour au menu", give_up: "Abandonner", focus_active: "Focus Actif",
-    freeze_active: "STASE", daily_title: "Bonus Quotidien", daily_claim: "Récupérer",
+    freeze_active: "STASE", daily_title: "Bonus Quotidien", daily_desc: "Série actuelle :", daily_claim: "Récupérer",
     claim: "Réclamer", unknown: "???", unlock: "Inconnu",
-    save_export: "Exporter", save_import: "Importer",
+    save_export: "Export Cloud", save_import: "Import Code",
     save_copied: "Copié !", reset_data: "Réinitialiser", reset_confirm: "Tout effacer ?",
     str: "Force", greed: "Avarice", wis: "Sagesse", points: "Points",
     raid_boss: "Raid Boss", raid_desc: "90 min • +++ REWARDS",
@@ -135,11 +62,11 @@ const TEXTS = {
     return_menu: "Return", give_up: "Give Up", focus_active: "Focus Active",
     freeze_active: "STASIS", daily_title: "Daily Bonus", daily_claim: "Claim",
     claim: "Claim", unknown: "???", unlock: "Unknown",
-    save_export: "Export", save_import: "Import",
+    save_export: "Cloud Export", save_import: "Import Code",
     save_copied: "Copied!", reset_data: "Reset", reset_confirm: "Erase everything?",
     str: "Strength", greed: "Greed", wis: "Wisdom", points: "Points",
     raid_boss: "Boss Raid", raid_desc: "90 min • +++ REWARDS",
-    zone_forest: "Ancient Forest", zone_catacombs: "Catacombes", zone_volcano: "Fire Mountain", zone_void: "The Void",
+    zone_forest: "Ancient Forest", zone_catacombs: "Catacombs", zone_volcano: "Fire Mountain", zone_void: "The Void",
     travel: "Travel", upgrade: "Upgrade", boss_spawn: "BOSS INCOMING!", combo: "COMBO",
     ad_chest: "Ad Chest", ad_chest_desc: `Watch for ${REWARD_AD_CHEST} 🪙`,
     ad_revive: "Revive", battery_mode_on: "Tap to wake",
@@ -215,39 +142,71 @@ const AMBIANCES = [
   { id: 'space', icon: "🌌", name: { fr: "Espace", en: "Space" }, bg: "bg-indigo-950" },
 ];
 
-interface MonsterAvatarProps {
-  color: string;
-  isBoss: boolean;
-  isHit: boolean;
-}
+// --- AUDIO PROCEDURAL ---
+let audioCtx_p: AudioContext | null = null;
+let ambianceNode: AudioBufferSourceNode | null = null;
+let ambianceGain: GainNode | null = null;
 
-const MonsterAvatar = ({ color, isBoss, isHit }: MonsterAvatarProps) => {
-  return (
-    <div className={`w-32 h-32 flex items-center justify-center transition-all ${isBoss ? 'scale-110 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]' : ''} ${isHit ? 'animate-shake brightness-150' : ''}`}>
-      <svg viewBox="0 0 100 100" className={`w-full h-full ${color}`}>
-        <circle cx="50" cy="50" r="40" fill="currentColor" opacity="0.8" />
-        <circle cx="35" cy="45" r="5" fill="white" />
-        <circle cx="65" cy="45" r="5" fill="white" />
-        <circle cx="35" cy="45" r="2" fill="black" />
-        <circle cx="65" cy="45" r="2" fill="black" />
-        <path d="M30,65 Q50,75 70,65" stroke="white" strokeWidth="3" fill="none" />
-      </svg>
-    </div>
-  );
+const initAudio = () => {
+  if (!audioCtx_p) {
+    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+    audioCtx_p = new AudioContextClass();
+  }
+  if (audioCtx_p && audioCtx_p.state === 'suspended') audioCtx_p.resume();
+  return audioCtx_p;
 };
 
-const SafeAdBanner = () => (
-  <div className="bg-black border-t border-stone-800 h-[50px] w-full flex items-center justify-center shrink-0 z-50">
-    <div className="text-stone-600 text-[10px] uppercase tracking-widest">Publicité (ID: ...3733)</div>
+const startProceduralAmbiance = (ctx: AudioContext, type: string, volume: number) => {
+  if (ambianceNode) { try { ambianceNode.stop(); } catch(e) {} }
+
+  const bufferSize = ctx.sampleRate * 2;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let lastOut = 0;
+  
+  for (let i = 0; i < bufferSize; i++) {
+    const white = Math.random() * 2 - 1;
+    lastOut = (lastOut + (0.02 * white)) / 1.02;
+    data[i] = lastOut * 3.5;
+    if (type === 'rain') data[i] *= 1.2;
+  }
+
+  ambianceNode = ctx.createBufferSource();
+  ambianceNode.buffer = buffer;
+  ambianceNode.loop = true;
+  ambianceGain = ctx.createGain();
+  ambianceGain.gain.value = volume * 0.2;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = type === 'fire' ? 400 : 800;
+
+  ambianceNode.connect(filter);
+  filter.connect(ambianceGain);
+  ambianceGain.connect(ctx.destination);
+  ambianceNode.start(0);
+};
+
+// --- COMPONENTS ---
+const MonsterAvatar = ({ color, isBoss, isHit }: { color: string, isBoss: boolean, isHit: boolean }) => (
+  <div className={`w-32 h-32 flex items-center justify-center transition-all ${isBoss ? 'scale-110 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]' : ''} ${isHit ? 'animate-shake brightness-150' : ''}`}>
+    <svg viewBox="0 0 100 100" className={`w-full h-full ${color}`}>
+      <circle cx="50" cy="50" r="40" fill="currentColor" opacity="0.8" />
+      <circle cx="35" cy="45" r="5" fill="white" />
+      <circle cx="65" cy="45" r="5" fill="white" />
+      <circle cx="35" cy="45" r="2" fill="black" />
+      <circle cx="65" cy="45" r="2" fill="black" />
+      <path d="M30,65 Q50,75 70,65" stroke="white" strokeWidth="3" fill="none" />
+    </svg>
   </div>
 );
 
-// --- COMPOSANT PRINCIPAL ---
+// --- APP ---
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [lang, setLang] = useState<'fr' | 'en'>('fr');
   
-  // States persistent
+  // Game States
   const [gold, setGold] = useState(0);
   const [playerXp, setPlayerXp] = useState(0);
   const [playerLevel, setPlayerLevel] = useState(1);
@@ -264,7 +223,7 @@ export default function App() {
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
 
-  // States UI
+  // UI States
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'defeat'>('menu');
   const [activeTab, setActiveTab] = useState<'play' | 'shop' | 'profile' | 'zones' | 'bestiary'>('play');
   const [shopTab, setShopTab] = useState<'weapons' | 'potions' | 'pets'>('weapons');
@@ -274,7 +233,7 @@ export default function App() {
   const [currentAmbiance, setCurrentAmbiance] = useState(0);
   const [isAdLoading, setIsAdLoading] = useState(false);
 
-  // States Battle
+  // Battle States
   const [timeLeft, setTimeLeft] = useState(0);
   const [selectedTime, setSelectedTime] = useState(25);
   const [monsterCurrentHp, setMonsterCurrentHp] = useState(100);
@@ -287,12 +246,11 @@ export default function App() {
   const [lastDamage, setLastDamage] = useState(0);
   const [isCrit, setIsCrit] = useState(false);
   const [shinyType, setShinyType] = useState<'none' | 'boss' | 'gold'>('none');
-  const [activeBuff, setActiveBuff] = useState<string | null>(null);
   const [isAttacking, setIsAttacking] = useState(false);
 
   const timerRef = useRef<any>(null);
 
-  // --- FIREBASE SYNC ---
+  // --- FIREBASE SYNC (RULE 3) ---
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -302,9 +260,10 @@ export default function App() {
       }
     };
     initAuth();
-    return onAuthStateChanged(auth, setUser);
+    return onAuthStateChanged(auth, (u: any) => setUser(u));
   }, []);
 
+  // Chargement des données (RULE 1)
   useEffect(() => {
     if (!user) return;
     const userDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'save', 'main');
@@ -327,15 +286,12 @@ export default function App() {
     const userDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'save', 'main');
     await setDoc(userDoc, {
       gold, playerLevel, playerXp, talents, unlockedZones, weaponLevels, currentWeapon,
-      ownedPets, equippedPet, bestiary, monstersKilled, totalMinutes, streakDays, inventory, lastLogin: Date.now()
+      ownedPets, equippedPet, bestiary, monstersKilled, totalMinutes, streakDays, inventory, lastUpdate: Date.now()
     }, { merge: true });
   };
 
-  // --- LOGIQUE DE JEU ---
-  const t = (k: string) => {
-    const langObj = TEXTS[lang] as any;
-    return langObj[k] || k;
-  };
+  // --- LOGIQUE ---
+  const t = (k: string) => (TEXTS[lang] as any)[k] || k;
   const tData = (d: any) => d[lang] || d['en'];
 
   const spawnMonster = (isFirst = false) => {
@@ -343,33 +299,16 @@ export default function App() {
     if (!zone) return;
     const mPool = zone.monsters;
     const isBoss = !isFirst && (sessionKills + 1) % 10 === 0;
-    
     const mId = isBoss ? mPool[mPool.length - 1] : mPool[Math.floor(Math.random() * (mPool.length - 1))];
     const monster = MONSTERS.find(m => m.id === mId) || MONSTERS[0];
-    
     setCurrentMonsterId(mId);
     setShinyType(isBoss ? 'boss' : (Math.random() > 0.95 ? 'gold' : 'none'));
-    
-    let hp = monster.baseHp * (isBoss ? 5 : 1) * (1 + playerLevel * 0.05);
-    setMonsterCurrentHp(hp);
-  };
-
-  const handleWatchAd = (rewardType: 'chest' | 'revive') => {
-    if (isAdLoading) return;
-    setIsAdLoading(true);
-    setTimeout(() => {
-      if (rewardType === 'chest') {
-        setGold(g => g + REWARD_AD_CHEST);
-      } else if (rewardType === 'revive') {
-        setGameState('playing');
-        spawnMonster(true);
-      }
-      setIsAdLoading(false);
-    }, 2000);
+    setMonsterCurrentHp(monster.baseHp * (isBoss ? 5 : 1) * (1 + playerLevel * 0.05));
   };
 
   const startBattle = (mins: number) => {
-    initAudio();
+    const ctx = initAudio();
+    if (ctx) startProceduralAmbiance(ctx, AMBIANCES[currentAmbiance].id, ambianceVolume);
     setSelectedTime(mins);
     setTimeLeft(mins * 60);
     setSessionKills(0); setSessionGold(0); setSessionXp(0);
@@ -381,9 +320,8 @@ export default function App() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (victory) {
       setGold(g => g + sessionGold);
-      setMonstersKilled(k => k + sessionKills);
+      setMonstersKilled(m => m + sessionKills);
       setTotalMinutes(m => m + selectedTime);
-      
       let xp = playerXp + sessionXp + (selectedTime * 10);
       let lvl = playerLevel;
       while (xp >= lvl * 100) { xp -= lvl * 100; lvl++; }
@@ -392,7 +330,6 @@ export default function App() {
     } else {
       setGameState('defeat');
     }
-    setActiveBuff(null);
     saveProgress();
   };
 
@@ -412,7 +349,7 @@ export default function App() {
           let dmg = (weapon.damage * (1 + lvl * 0.2)) * (1 + talents.str * 0.05);
           if (pet && pet.type === 'damage') dmg += pet.val;
 
-          const critChance = 0.15 + (pet && pet.type === 'crit' ? pet.val : 0);
+          const critChance = 0.15 + (pet && pet.type === 'crit' ? (pet.val as number) : 0);
           const crit = Math.random() < critChance;
           if (crit) dmg *= 3;
           
@@ -424,11 +361,7 @@ export default function App() {
               const m = MONSTERS.find(mo => mo.id === currentMonsterId);
               if (!m) return 0;
               let gMult = (1 + talents.greed * 0.05) * (1 + combo * 0.1);
-              if (activeBuff === 'potion_gold') gMult *= 2;
-              if (pet && pet.type === 'gold') gMult *= (1 + pet.val);
-              
               let xMult = (1 + talents.wis * 0.05);
-              if (pet && pet.type === 'xp') xMult *= (1 + pet.val);
 
               let gWon = Math.floor(m.xp * gMult);
               let xWon = Math.floor(m.xp * xMult);
@@ -437,10 +370,9 @@ export default function App() {
               
               setSessionGold(sg => sg + gWon);
               setSessionXp(sx => sx + xWon);
-              setSessionKills(sk => sk + 1);
+              setSessionKills(sk => sk + sk + 1);
               setCombo(c => Math.min(c + 1, 10));
               setBestiary(b => b.includes(currentMonsterId) ? b : [...b, currentMonsterId]);
-              
               spawnMonster();
               return 999999;
             }
@@ -451,32 +383,13 @@ export default function App() {
       }, 1000);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [gameState, currentMonsterId, combo, equippedPet, activeBuff, currentWeapon, weaponLevels, talents]);
-
-  useEffect(() => {
-    if (gameState === 'playing') {
-      toggleAmbiance(true, AMBIANCES[currentAmbiance].id, ambianceVolume);
-    } else {
-      toggleAmbiance(false, 'silence', 0);
-    }
-  }, [gameState, currentAmbiance, ambianceVolume]);
-
-  const availableTalents = Math.max(0, (playerLevel - 1) - (talents.str + talents.greed + talents.wis));
-  const currentZoneObj = ZONES.find(z => z.id === currentZone) || ZONES[0];
+  }, [gameState, currentMonsterId, combo, equippedPet, currentWeapon, weaponLevels, talents]);
 
   return (
     <div className={`fixed inset-0 flex items-center justify-center bg-stone-950 text-white font-mono select-none overflow-hidden ${AMBIANCES[currentAmbiance].bg}`}>
       <style>{`
-        @keyframes strike {
-          0% { transform: translateY(0) rotate(0deg); }
-          20% { transform: translateY(-30px) rotate(-15deg); }
-          100% { transform: translateY(0) rotate(0deg); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
+        @keyframes strike { 0% { transform: translateY(0) rotate(0deg); } 20% { transform: translateY(-30px) rotate(-15deg); } 100% { transform: translateY(0) rotate(0deg); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
         .animate-strike { animation: strike 0.3s ease-out; }
         .animate-shake { animation: shake 0.1s linear infinite; }
       `}</style>
@@ -486,9 +399,7 @@ export default function App() {
         {/* HEADER */}
         <div className="p-4 bg-stone-900 border-b border-stone-800 flex justify-between items-center z-50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-stone-800 rounded-full border-2 border-stone-700 flex items-center justify-center font-bold text-sm">
-              {playerLevel}
-            </div>
+            <div className="w-10 h-10 bg-stone-800 rounded-full border-2 border-stone-700 flex items-center justify-center font-bold text-sm">{playerLevel}</div>
             <div className="w-24">
               <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-500 transition-all" style={{width: `${(playerXp/(playerLevel*100))*100}%`}}></div>
@@ -500,132 +411,129 @@ export default function App() {
             <div className="bg-stone-800 px-3 py-1.5 rounded-lg border border-stone-700 font-bold text-yellow-500 text-sm flex items-center gap-2">
               <ShoppingBag size={14}/> {Math.floor(gold)}
             </div>
-            <button onClick={() => setShowSettings(!showSettings)} className="text-stone-500 hover:text-white transition-colors">
-              <Settings size={20}/>
-            </button>
+            <button onClick={() => setShowSettings(!showSettings)} className="text-stone-500 hover:text-white transition-colors"><Settings size={20}/></button>
           </div>
         </div>
 
-        {/* MODAL SETTINGS */}
+        {/* SETTINGS MODAL */}
         {showSettings && (
           <div className="absolute inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
-            <div className="bg-stone-800 w-full rounded-2xl p-6 border border-stone-700 shadow-2xl">
+            <div className="bg-stone-800 w-full rounded-2xl p-6 border border-stone-700">
               <div className="flex justify-between items-center mb-6"><h3 className="font-black uppercase">{t('settings')}</h3><button onClick={() => setShowSettings(false)}><X/></button></div>
               <div className="space-y-6">
-                <div className="flex justify-between items-center"><span className="text-sm font-bold">{t('lang_select')}</span><button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="bg-stone-700 px-4 py-1.5 rounded-lg text-xs font-black uppercase">{lang}</button></div>
-                <div className="space-y-2"><div className="flex justify-between text-xs text-stone-500 uppercase font-bold"><span>{t('ambiance')}</span><span>{Math.round(ambianceVolume*100)}%</span></div><input type="range" min="0" max="1" step="0.1" value={ambianceVolume} onChange={(e) => setAmbianceVolume(parseFloat(e.target.value))} className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none" /></div>
-                <div className="flex gap-2 pt-4"><button onClick={saveProgress} className="flex-1 bg-stone-700 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Upload size={14}/> {t('save_export')}</button><button onClick={() => {if(confirm(t('reset_confirm'))) {localStorage.clear(); window.location.reload();}}} className="flex-1 bg-red-900/30 py-3 rounded-xl text-xs text-red-400 font-bold">{t('reset_data')}</button></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold">{t('lang_select')}</span>
+                  <button onClick={() => setLang(l => l === 'fr' ? 'en' : 'fr')} className="bg-stone-700 px-4 py-1.5 rounded-lg text-xs font-black uppercase">{lang}</button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-stone-500 font-bold uppercase"><span>{t('ambiance')}</span><span>{Math.round(ambianceVolume*100)}%</span></div>
+                  <input type="range" min="0" max="1" step="0.1" value={ambianceVolume} onChange={(e) => setAmbianceVolume(parseFloat(e.target.value))} className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none" />
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <button onClick={saveProgress} className="flex-1 bg-stone-700 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2"><Upload size={14}/> {t('save_export')}</button>
+                  <button onClick={() => { if(confirm(t('reset_confirm'))) { localStorage.clear(); window.location.reload(); }}} className="flex-1 bg-red-900/30 py-3 rounded-xl text-xs text-red-400 font-bold">{t('reset_data')}</button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* MAIN CONTENT */}
+        {/* CONTENT */}
         <div className="flex-1 overflow-y-auto pb-24">
           {gameState === 'menu' && (
             <div className="p-4 space-y-6">
               
-              {(activeTab === 'profile' || activeTab === 'zones' || activeTab === 'bestiary') && (
-                <div className="flex gap-2 bg-stone-900 p-1 rounded-xl border border-stone-800 mb-2">
-                  <button onClick={() => setActiveTab('zones')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${activeTab === 'zones' ? 'bg-indigo-600 text-white' : 'text-stone-500'}`}>{t('zones')}</button>
-                  <button onClick={() => setActiveTab('profile')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${activeTab === 'profile' ? 'bg-stone-600 text-white' : 'text-stone-500'}`}>{t('profile')}</button>
-                  <button onClick={() => setActiveTab('bestiary')} className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg ${activeTab === 'bestiary' ? 'bg-stone-600 text-white' : 'text-stone-500'}`}>{t('bestiary')}</button>
+              {/* SUBTABS */}
+              {(['play', 'shop', 'profile', 'zones', 'bestiary'].includes(activeTab)) && (
+                <div className="flex gap-2 bg-stone-900 p-1 rounded-xl border border-stone-800 mb-2 overflow-x-auto">
+                  {['zones', 'play', 'shop', 'profile', 'bestiary'].map((tab) => (
+                    <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex-1 py-2 px-3 text-[10px] font-black uppercase rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-indigo-600 text-white' : 'text-stone-500'}`}>{t(tab)}</button>
+                  ))}
                 </div>
               )}
 
               {activeTab === 'play' && (
                 <div className="animate-in fade-in duration-500">
-                  <div className={`w-full h-48 rounded-2xl bg-gradient-to-br ${currentZoneObj.color} border-4 border-stone-800 flex flex-col items-center justify-center relative mb-6 shadow-inner`}>
-                    <div className="text-7xl mb-2 drop-shadow-xl">{currentZoneObj.icon}</div>
-                    <div className="font-black text-2xl uppercase tracking-widest text-white drop-shadow-md">{t(currentZoneObj.name)}</div>
+                  <div className={`w-full h-48 rounded-2xl bg-gradient-to-br ${ZONES.find(z => z.id === currentZone)?.color} border-4 border-stone-800 flex flex-col items-center justify-center relative mb-6 shadow-inner`}>
+                    <div className="text-7xl mb-2 drop-shadow-xl">{ZONES.find(z => z.id === currentZone)?.icon}</div>
+                    <div className="font-black text-2xl uppercase tracking-widest text-white drop-shadow-md">{t(ZONES.find(z => z.id === currentZone)?.name || "")}</div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3 mb-6">
                     {[10, 25, 45, 60].map(time => (
-                      <button key={time} onClick={() => startBattle(time)} className="bg-stone-800/50 hover:bg-stone-800 border-2 border-stone-800 p-4 rounded-2xl flex flex-col items-center group transition-all">
+                      <button key={time} onClick={() => startBattle(time)} className="bg-stone-800/50 hover:bg-stone-800 border-2 border-stone-800 p-4 rounded-2xl flex flex-col items-center group active:scale-95 transition-all">
                         <span className="text-3xl font-black group-hover:text-red-500">{time}</span>
                         <span className="text-[10px] text-stone-500 font-bold uppercase tracking-widest">{t('minutes')}</span>
                       </button>
                     ))}
                   </div>
-
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {AMBIANCES.map((a, i) => (
-                      <button key={a.id} onClick={() => setCurrentAmbiance(i)} className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${currentAmbiance === i ? 'bg-white text-stone-900 border-white' : 'bg-stone-900 text-stone-500 border-stone-800'}`}>
-                        {a.icon} {tData(a.name)}
-                      </button>
+                      <button key={a.id} onClick={() => setCurrentAmbiance(i)} className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all ${currentAmbiance === i ? 'bg-white text-stone-900 border-white' : 'bg-stone-900 text-stone-500 border-stone-800'}`}>{a.icon} {tData(a.name)}</button>
                     ))}
                   </div>
                 </div>
               )}
 
               {activeTab === 'shop' && (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                   <div className="flex bg-stone-900 p-1 rounded-xl border border-stone-800">
-                     {['weapons', 'potions', 'pets'].map(tab => (
-                       <button key={tab} onClick={() => setShopTab(tab as any)} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg ${shopTab === tab ? 'bg-stone-700 text-white' : 'text-stone-500'}`}>{t(tab)}</button>
-                     ))}
-                   </div>
+                <div className="space-y-4">
+                  <div className="flex bg-stone-900 p-1 rounded-xl border border-stone-800">
+                    {['weapons', 'potions', 'pets'].map(tab => (
+                      <button key={tab} onClick={() => setShopTab(tab as any)} className={`flex-1 py-2 text-xs font-black uppercase rounded-lg ${shopTab === tab ? 'bg-stone-700 text-white' : 'text-stone-500'}`}>{t(tab)}</button>
+                    ))}
+                  </div>
+                  <button onClick={() => handleWatchAd('chest')} className="w-full bg-yellow-900/30 border border-yellow-600 p-4 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Video className={`text-yellow-500 ${isAdLoading ? 'animate-spin' : ''}`} />
+                      <div className="text-left"><div className="text-xs font-black text-yellow-100 uppercase">{t('ad_chest')}</div><div className="text-[10px] text-yellow-500/70">{t('ad_chest_desc')}</div></div>
+                    </div>
+                    <div className="bg-yellow-600 text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase">GO</div>
+                  </button>
 
-                   <button onClick={() => handleWatchAd('chest')} className="w-full bg-yellow-900/30 border border-yellow-600 p-4 rounded-2xl flex items-center justify-between group">
-                      <div className="flex items-center gap-4">
-                        <Video className={`text-yellow-500 ${isAdLoading ? 'animate-spin' : ''}`} />
-                        <div className="text-left"><div className="text-xs font-black text-yellow-100 uppercase">{t('ad_chest')}</div><div className="text-[10px] text-yellow-500/70">{t('ad_chest_desc')}</div></div>
+                  {shopTab === 'weapons' && WEAPONS.map((w, i) => {
+                    const isOwned = i <= currentWeapon;
+                    const lvl = weaponLevels[i] || 0;
+                    const upCost = Math.floor(w.cost * 0.5 * (lvl + 1)) || 100;
+                    return (
+                      <div key={w.id} className={`p-4 rounded-2xl border transition-all ${i === currentWeapon ? 'border-green-600 bg-green-950/20' : 'border-stone-800 bg-stone-900/40'}`}>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-stone-800 rounded-xl flex items-center justify-center text-2xl relative">{w.icon}{lvl > 0 && <span className="absolute -top-1 -right-1 bg-blue-600 text-[9px] px-1.5 py-0.5 rounded font-bold">+{lvl}</span>}</div>
+                            <div><div className="text-sm font-black uppercase">{tData(w.name)}</div><div className="text-[10px] text-stone-500 font-bold">{t('damage')}: {Math.floor(w.damage * (1 + lvl * 0.2))}</div></div>
+                          </div>
+                          {!isOwned ? <button onClick={() => { if(gold>=w.cost) { setGold(g=>g-w.cost); setCurrentWeapon(i); saveProgress(); }}} className="bg-yellow-600 px-4 py-1.5 rounded-lg text-xs font-black">{w.cost} 🪙</button> : (i === currentWeapon ? <div className="text-green-500 text-[10px] font-black uppercase">{t('equipped')}</div> : <button onClick={() => setCurrentWeapon(i)} className="text-stone-500 text-xs font-bold">{t('equipped')}</button>)}
+                        </div>
+                        {isOwned && <button onClick={() => { if(gold >= upCost) { setGold(g => g - upCost); setWeaponLevels({...weaponLevels, [i]: lvl + 1}); saveProgress(); }}} className="w-full bg-stone-800 mt-3 py-2 rounded-xl text-[10px] font-black uppercase text-stone-400 border border-stone-700">{t('upgrade')} — {upCost} 🪙</button>}
                       </div>
-                      <div className="bg-yellow-600 text-black px-3 py-1 rounded-lg text-[10px] font-black uppercase">GO</div>
-                   </button>
-
-                   {shopTab === 'weapons' && WEAPONS.map((w, i) => {
-                     const isOwned = i <= currentWeapon;
-                     const lvl = weaponLevels[i] || 0;
-                     const upCost = Math.floor(w.cost * 0.5 * (lvl + 1)) || 100;
-                     return (
-                       <div key={w.id} className={`p-4 rounded-2xl border transition-all ${i === currentWeapon ? 'border-green-600 bg-green-950/20' : 'border-stone-800 bg-stone-900/40'}`}>
-                         <div className="flex justify-between items-center mb-3">
-                           <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 bg-stone-800 rounded-xl flex items-center justify-center text-2xl relative">{w.icon}{lvl > 0 && <span className="absolute -top-1 -right-1 bg-blue-600 text-[9px] px-1.5 py-0.5 rounded font-bold">+{lvl}</span>}</div>
-                             <div><div className="text-sm font-black uppercase">{tData(w.name)}</div><div className="text-[10px] text-stone-500 font-bold">{t('damage')}: {Math.floor(w.damage * (1 + lvl * 0.2))}</div></div>
-                           </div>
-                           {!isOwned ? (
-                             <button onClick={() => {if(gold>=w.cost){setGold(g=>g-w.cost); setCurrentWeapon(i)}}} className="bg-yellow-600 px-4 py-1.5 rounded-lg text-xs font-black">{w.cost} 🪙</button>
-                           ) : (
-                             i === currentWeapon ? <div className="text-green-500 text-[10px] font-black uppercase">{t('equipped')}</div> : <button onClick={() => setCurrentWeapon(i)} className="text-stone-500 text-xs font-bold">{t('equipped')}</button>
-                           )}
-                         </div>
-                         {isOwned && <button onClick={() => { if(gold >= upCost) { setGold(g => g - upCost); setWeaponLevels({...weaponLevels, [i]: lvl + 1}); }}} className="w-full bg-stone-800 py-2 rounded-xl text-[10px] font-black uppercase text-stone-400 border border-stone-700">{t('upgrade')} — {upCost} 🪙</button>}
-                       </div>
-                     );
-                   })}
-
-                   {shopTab === 'potions' && ITEMS.map(item => (
-                     <button key={item.id} onClick={() => { if(gold >= item.cost) { setGold(g => g - item.cost); setInventory([...inventory, item.id]); }}} className="w-full p-4 rounded-2xl bg-stone-900/40 border border-stone-800 flex items-center justify-between">
-                       <div className="flex items-center gap-4"><div className="w-10 h-10 bg-stone-800 rounded flex items-center justify-center text-xl">{item.icon}</div><div><div className="text-sm font-black uppercase">{tData(item.name)}</div><div className="text-[10px] text-stone-500">{tData(item.effect)}</div></div></div>
-                       <div className="text-yellow-500 font-bold">{item.cost} 🪙</div>
-                     </button>
-                   ))}
-
-                   {shopTab === 'pets' && PETS.map(p => {
-                     const isOwned = ownedPets.includes(p.id);
-                     const isEquipped = equippedPet === p.id;
-                     return (
-                       <button key={p.id} onClick={() => { if(!isOwned && gold >= p.cost) { setGold(g => g - p.cost); setOwnedPets([...ownedPets, p.id]); setEquippedPet(p.id); } else if(isOwned) { setEquippedPet(isEquipped ? null : p.id); }}} className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-between ${isEquipped ? 'border-blue-500 bg-blue-950/20' : 'border-stone-800 bg-stone-900/40'}`}>
-                         <div className="flex items-center gap-4"><div className="w-12 h-12 bg-stone-800 rounded flex items-center justify-center text-xl">{p.icon}</div><div><div className="text-sm font-black uppercase">{tData(p.name)}</div><div className="text-[10px] text-stone-500">{tData(p.desc)}</div></div></div>
-                         {!isOwned ? <div className="text-yellow-500 font-bold">{p.cost} 🪙</div> : <div className={`text-[10px] font-black uppercase ${isEquipped ? 'text-blue-500' : 'text-stone-500'}`}>{isEquipped ? 'ACTIF' : 'ACTIVER'}</div>}
-                       </button>
-                     );
-                   })}
+                    );
+                  })}
+                  {shopTab === 'potions' && ITEMS.map(it => (
+                    <button key={it.id} onClick={() => { if(gold >= it.cost) { setGold(g => g - it.cost); setInventory([...inventory, it.id]); saveProgress(); }}} className="w-full p-4 rounded-2xl bg-stone-900/40 border border-stone-800 flex items-center justify-between">
+                      <div className="flex items-center gap-4"><div className="w-10 h-10 bg-stone-800 rounded flex items-center justify-center text-xl">{it.icon}</div><div><div className="text-sm font-black uppercase">{tData(it.name)}</div><div className="text-[10px] text-stone-500">{tData(it.effect)}</div></div></div>
+                      <div className="text-yellow-500 font-bold">{it.cost} 🪙</div>
+                    </button>
+                  ))}
+                  {shopTab === 'pets' && PETS.map(p => {
+                    const isOwned = ownedPets.includes(p.id);
+                    const isEquipped = equippedPet === p.id;
+                    return (
+                      <button key={p.id} onClick={() => { if(!isOwned && gold >= p.cost) { setGold(g => g - p.cost); setOwnedPets([...ownedPets, p.id]); setEquippedPet(p.id); saveProgress(); } else if(isOwned) { setEquippedPet(isEquipped ? null : p.id); }}} className={`w-full p-4 rounded-2xl border flex items-center justify-between ${isEquipped ? 'border-blue-500 bg-blue-950/20' : 'border-stone-800 bg-stone-900/40'}`}>
+                        <div className="flex items-center gap-4"><div className="w-12 h-12 bg-stone-800 rounded flex items-center justify-center text-2xl">{p.icon}</div><div><div className="text-sm font-black uppercase">{tData(p.name)}</div><div className="text-[10px] text-stone-500">{tData(p.desc)}</div></div></div>
+                        {!isOwned ? <div className="text-yellow-500 font-bold">{p.cost} 🪙</div> : <div className={`text-[10px] font-black uppercase ${isEquipped ? 'text-blue-500' : 'text-stone-500'}`}>{isEquipped ? 'ACTIF' : 'ACTIVER'}</div>}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
               {activeTab === 'zones' && (
-                <div className="space-y-3 animate-in fade-in duration-300">
+                <div className="space-y-3">
                   {ZONES.map(z => {
                     const isUnlocked = unlockedZones.includes(z.id);
                     return (
-                      <button key={z.id} onClick={() => isUnlocked ? setCurrentZone(z.id) : null} className={`w-full relative overflow-hidden rounded-2xl border-2 transition-all p-4 flex items-center justify-between ${currentZone === z.id ? 'border-indigo-500' : 'border-stone-800'} ${!isUnlocked ? 'opacity-50 grayscale' : ''}`}>
+                      <button key={z.id} onClick={() => isUnlocked ? setCurrentZone(z.id) : null} className={`w-full relative overflow-hidden rounded-2xl border-2 p-4 flex items-center justify-between ${currentZone === z.id ? 'border-indigo-500' : 'border-stone-800'} ${!isUnlocked ? 'opacity-50 grayscale' : ''}`}>
                          <div className={`absolute inset-0 bg-gradient-to-r ${z.color} opacity-40`}></div>
                          <div className="relative flex items-center gap-4"><div className="text-3xl">{z.icon}</div><div><div className="font-bold text-sm text-white uppercase">{t(z.name)}</div><div className="text-[10px] text-stone-300">Bonus x{z.mult}</div></div></div>
-                         {!isUnlocked ? <button onClick={(e) => { e.stopPropagation(); if(gold >= z.cost) { setGold(g => g - z.cost); setUnlockedZones([...unlockedZones, z.id]); }}} className="relative bg-stone-900 px-3 py-1.5 rounded text-yellow-500 text-[10px] font-black"><Lock size={12} className="inline mr-1"/> {z.cost}</button> : (currentZone === z.id ? <div className="relative text-indigo-400 font-black text-[10px]">ACTUEL</div> : <ArrowRight size={16} className="relative text-stone-500"/>)}
+                         {!isUnlocked ? <button onClick={(e) => { e.stopPropagation(); if(gold >= z.cost) { setGold(g => g - z.cost); setUnlockedZones([...unlockedZones, z.id]); saveProgress(); }}} className="relative bg-stone-900 px-3 py-1.5 rounded text-yellow-500 text-[10px] font-black"><Lock size={12} className="inline mr-1"/> {z.cost}</button> : (currentZone === z.id ? <div className="relative text-indigo-400 font-black text-[10px]">ACTUEL</div> : <ArrowRight size={16} className="relative text-stone-500"/>)}
                       </button>
                     );
                   })}
@@ -633,7 +541,7 @@ export default function App() {
               )}
 
               {activeTab === 'bestiary' && (
-                <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-300">
+                <div className="grid grid-cols-2 gap-3">
                    {MONSTERS.map(m => {
                      const unlocked = bestiary.includes(m.id);
                      return (
@@ -642,7 +550,6 @@ export default function App() {
                             {unlocked ? <MonsterAvatar color={m.color} isBoss={false} isHit={false} /> : <Skull size={24} className="text-stone-700" />}
                           </div>
                           <div className="text-[11px] font-black uppercase text-stone-200">{unlocked ? tData(m.name) : t('unknown')}</div>
-                          {unlocked && <div className="text-[8px] italic text-stone-500 mt-1 line-clamp-2">"{tData(m.lore)}"</div>}
                        </div>
                      );
                    })}
@@ -650,114 +557,65 @@ export default function App() {
               )}
 
               {activeTab === 'profile' && (
-                <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="space-y-6">
                   <div className="bg-stone-800/50 p-6 rounded-2xl border border-stone-800">
                     <div className="flex justify-between items-center mb-6"><h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Pickaxe size={16} className="text-stone-500"/> {t('talents')}</h3><span className="text-xs font-bold text-stone-500">{t('points')}: <span className="text-white">{availableTalents}</span></span></div>
                     <div className="space-y-3">
                       {(['str', 'greed', 'wis'] as const).map(key => (
                         <div key={key} className="bg-stone-900/50 p-3.5 rounded-xl flex justify-between items-center border border-stone-800/50">
-                          <span className="text-xs font-bold uppercase text-stone-400">{t(key)} (+{talents[key]*5}%)</span>
-                          <div className="flex items-center gap-4"><span className="font-black text-sm">{talents[key]}</span><button disabled={availableTalents <= 0} onClick={() => setTalents({...talents, [key]: talents[key] + 1})} className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-900/20">+</button></div>
+                          <span className="text-xs font-bold uppercase text-stone-400">{t(key)} (+{(talents as any)[key]*5}%)</span>
+                          <div className="flex items-center gap-4"><span className="font-black text-sm">{(talents as any)[key]}</span><button disabled={availableTalents <= 0} onClick={() => {setTalents({...talents, [key]: (talents as any)[key] + 1}); saveProgress();}} className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-900/20">+</button></div>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
-                    {[{label: 'kills', val: monstersKilled, color: 'text-red-500'}, {label: 'hours', val: (totalMinutes/60).toFixed(1), color: 'text-blue-500'}, {label: 'streak', val: `${streakDays} 🔥`, color: 'text-orange-500'}].map(s => (
+                    {[{label: 'kills', val: monstersKilled}, {label: 'hours', val: (totalMinutes/60).toFixed(1)}, {label: 'streak', val: `${streakDays} 🔥`}].map(s => (
                       <div key={s.label} className="bg-stone-900 p-4 rounded-2xl text-center border border-stone-800">
                         <div className="text-[9px] text-stone-500 uppercase font-black mb-1">{t(s.label)}</div>
-                        <div className={`font-black text-lg ${s.color}`}>{s.val}</div>
+                        <div className="font-black text-lg">{s.val}</div>
                       </div>
                     ))}
                   </div>
-                  {inventory.length > 0 && (
-                    <div className="bg-stone-800/50 p-4 rounded-2xl border border-stone-800">
-                      <div className="text-[10px] font-black text-stone-500 uppercase mb-3 flex items-center gap-2"><ShoppingBag size={12}/> {t('backpack')}</div>
-                      <div className="flex flex-wrap gap-2">
-                        {inventory.map((id, idx) => {
-                          const item = ITEMS.find(it => it.id === id);
-                          if (!item) return null;
-                          return (
-                            <button key={idx} onClick={() => { setActiveBuff(id); setInventory(inventory.filter((_, i) => i !== idx)); }} className="bg-stone-900 px-3 py-2 rounded-lg border border-stone-700 text-xs flex items-center gap-2 group hover:bg-stone-800 transition-all">
-                              <span>{item.icon}</span> <span className="text-[10px] font-black uppercase">{tData(item.name)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* PLAYING STATE UI */}
+          {/* BATTLE UI */}
           {gameState === 'playing' && (
             <div className={`fixed inset-0 z-[200] flex flex-col ${batteryMode ? 'bg-black' : 'bg-stone-950 transition-colors duration-1000'}`}>
-              {batteryMode && (
-                <div onClick={() => setBatteryMode(false)} className="absolute inset-0 z-[210] bg-black flex flex-col items-center justify-center text-stone-800 animate-pulse">
-                  <EyeOff size={64} className="mb-4" />
-                  <div className="text-xs font-black uppercase tracking-[0.3em]">{t('battery_mode_on')}</div>
-                </div>
-              )}
-              
+              {batteryMode && <div onClick={() => setBatteryMode(false)} className="absolute inset-0 z-[210] bg-black flex flex-col items-center justify-center text-stone-800 animate-pulse"><EyeOff size={64} className="mb-4" /><div className="text-xs font-black uppercase tracking-[0.3em]">{t('battery_mode_on')}</div></div>}
               <div className="p-4 flex justify-between items-center">
-                <button onClick={() => setBatteryMode(!batteryMode)} className="text-stone-600 hover:text-white"><Battery size={20}/></button>
+                <button onClick={() => setBatteryMode(!batteryMode)} className="text-stone-600"><Battery size={20}/></button>
                 <div className="bg-stone-900/50 px-3 py-1 rounded-full border border-stone-800 text-[10px] font-black uppercase tracking-widest text-stone-500 animate-pulse">
                    <Shield size={10} className="inline mr-2 text-red-500"/> {t('focus_active')}
                 </div>
-                <button onClick={() => setGameState('menu')} className="text-stone-600 hover:text-red-500"><X size={20}/></button>
+                <button onClick={() => setGameState('menu')} className="text-stone-600"><X size={20}/></button>
               </div>
-
               <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
-                <div className="text-7xl font-black mb-16 tracking-tighter tabular-nums text-white drop-shadow-2xl">
-                  {Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2, '0')}
-                </div>
-
+                <div className="text-7xl font-black mb-16 tracking-tighter tabular-nums text-white drop-shadow-2xl">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2, '0')}</div>
                 <div className="relative mb-12 flex flex-col items-center">
-                  <MonsterAvatar 
-                    color={(MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0]).color} 
-                    isBoss={shinyType === 'boss'} 
-                    isHit={isHit}
-                  />
-                  
-                  {isHit && (
-                    <div className={`absolute -top-12 left-1/2 -translate-x-1/2 font-black text-5xl pointer-events-none select-none animate-in slide-in-from-bottom-2 ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>
-                      -{lastDamage}
-                    </div>
-                  )}
-
+                  <MonsterAvatar color={(MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0]).color} isBoss={shinyType === 'boss'} isHit={isHit} />
+                  {isHit && <div className={`absolute -top-12 left-1/2 -translate-x-1/2 font-black text-5xl animate-in slide-in-from-bottom-2 ${isCrit ? 'text-yellow-400 scale-125' : 'text-red-500'}`}>-{lastDamage}</div>}
                   <div className="w-56 bg-stone-900 h-2.5 rounded-full mt-10 border border-stone-800 overflow-hidden shadow-inner">
                     <div className={`h-full transition-all duration-300 ${shinyType === 'boss' ? 'bg-red-600' : 'bg-green-500'}`} style={{ width: `${(monsterCurrentHp / ( (MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0]).baseHp * (shinyType==='boss'?5:1) * (1+playerLevel*0.05) )) * 100}%` }}></div>
                   </div>
                   <div className="text-[10px] text-stone-500 mt-3 font-black uppercase tracking-widest">{tData((MONSTERS.find(m => m.id === currentMonsterId) || MONSTERS[0]).name)}</div>
                 </div>
-
                 <div className="grid grid-cols-3 gap-8 w-full max-w-xs">
-                  <div className="text-center">
-                    <div className="text-[9px] text-stone-600 uppercase font-black mb-1">{t('kills')}</div>
-                    <div className="font-black text-lg text-red-500">{sessionKills}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[9px] text-stone-600 uppercase font-black mb-1">{t('gold')}</div>
-                    <div className="font-black text-lg text-yellow-500">{sessionGold}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[9px] text-stone-600 uppercase font-black mb-1">{t('combo')}</div>
-                    <div className={`font-black text-lg transition-all ${combo > 0 ? 'text-orange-500 scale-110' : 'text-stone-800'}`}>x{combo}</div>
-                  </div>
+                  <div className="text-center"><div className="text-[9px] text-stone-600 uppercase font-black">{t('kills')}</div><div className="font-black text-lg text-red-500">{sessionKills}</div></div>
+                  <div className="text-center"><div className="text-[9px] text-stone-600 uppercase font-black">{t('gold')}</div><div className="font-black text-lg text-yellow-500">{sessionGold}</div></div>
+                  <div className="text-center"><div className="text-[9px] text-stone-600 uppercase font-black">{t('combo')}</div><div className={`font-black text-lg transition-all ${combo > 0 ? 'text-orange-500 scale-110' : 'text-stone-800'}`}>x{combo}</div></div>
                 </div>
-
-                <div className={`mt-16 text-7xl transition-all duration-100 ${isAttacking ? 'animate-strike' : 'opacity-20'}`}>
-                  {WEAPONS[currentWeapon].icon}
-                </div>
+                <div className={`mt-16 text-7xl transition-all duration-100 ${isAttacking ? 'animate-strike' : 'opacity-20'}`}>{WEAPONS[currentWeapon].icon}</div>
               </div>
             </div>
           )}
 
-          {/* RESULTS */}
+          {/* RESULTS VIEW */}
           {(gameState === 'victory' || gameState === 'defeat') && (
-            <div className="fixed inset-0 z-[300] bg-stone-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
+            <div className="fixed inset-0 z-[300] bg-stone-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in">
               {gameState === 'victory' ? (
                 <>
                   <Trophy size={64} className="text-yellow-500 mb-6 animate-bounce" />
@@ -772,9 +630,7 @@ export default function App() {
                 <>
                   <Skull size={80} className="text-red-600 mb-8 animate-pulse" />
                   <h2 className="text-4xl font-black mb-8 uppercase text-red-600 tracking-tighter">{t('defeat')}</h2>
-                  <button onClick={() => handleWatchAd('revive')} className="w-full bg-blue-600 py-4 rounded-2xl font-black uppercase text-sm mb-4 flex items-center justify-center gap-3 active:scale-95 transition-all">
-                    <Video size={18}/> {t('ad_revive')}
-                  </button>
+                  <button onClick={() => handleWatchAd('revive')} className="w-full bg-blue-600 py-4 rounded-2xl font-black uppercase text-sm mb-4 flex items-center justify-center gap-3 active:scale-95 transition-all"><Video size={18}/> {t('ad_revive')}</button>
                 </>
               )}
               <button onClick={() => {setGameState('menu'); setActiveTab('play');}} className="w-full bg-white text-stone-950 py-5 rounded-2xl font-black uppercase text-sm tracking-widest active:scale-95 transition-all">{t('return_menu')}</button>
